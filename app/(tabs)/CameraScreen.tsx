@@ -1,92 +1,102 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, Image, Button, Alert, TouchableOpacity, SafeAreaView } from 'react-native';
-import { useCameraPermissions } from 'expo-camera';
+import { StyleSheet, Text, View, Alert, ActivityIndicator } from 'react-native';
+import { Camera } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
-import { firebase } from '../../firebaseConfig'; // Đảm bảo Firebase được cấu hình đúng
+import { firebase } from '../../firebaseConfig';
+import { useNavigation } from '@react-navigation/native';
 
 export default function CameraScreen() {
-  const [permission, requestPermission] = useCameraPermissions();
-  const [photoUri, setPhotoUri] = useState(null);
+  const [hasCameraPermission, setHasCameraPermission] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const navigation = useNavigation();
 
   useEffect(() => {
-    if (permission?.granted) {
-      takeImage();
-    }
-  }, [permission?.granted]);
+    checkPermissionAndTakePhoto();
+  }, []);
 
-  if (!permission) {
-    return <View />;
-  }
+  const checkPermissionAndTakePhoto = async () => {
+    const { status } = await Camera.requestCameraPermissionsAsync();
+    setHasCameraPermission(status === 'granted');
 
-  if (!permission.granted) {
-    return (
-      <View style={styles.permissionContainer}>
-        <Text style={{ textAlign: 'center' }}>We need your permission to show the camera</Text>
-        <Button onPress={requestPermission} title="Grant Permission" />
-      </View>
-    );
-  }
-
-  const takeImage = async () => {
-    let result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      aspect: [6, 9],
-      quality: 1,
-    });
-
-    console.log(result); // Kiểm tra kết quả trên console
-
-    if (!result.cancelled) {
-      setPhotoUri(result.assets[0].uri); // Cập nhật trạng thái hình ảnh với URI của ảnh đã chụp
+    if (status === 'granted') {
+      takePhoto();
+    } else {
+      Alert.alert(
+        'Quyền truy cập camera bị từ chối',
+        'Vui lòng cấp quyền truy cập camera trong cài đặt để sử dụng tính năng này.',
+        [{ text: 'OK', onPress: () => navigation.goBack() }]
+      );
     }
   };
 
-  const uploadImage = async () => {
+  const takePhoto = async () => {
+    try {
+      let result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [6, 9],
+        quality: 1,
+      });
+
+      if (result && !result.canceled) {
+        uploadImage(result.assets[0].uri);
+      } else {
+        navigation.goBack();
+      }
+    } catch (error) {
+      console.error('Lỗi khi chụp ảnh:', error);
+      Alert.alert('Lỗi', 'Không thể chụp ảnh. Vui lòng thử lại.');
+      navigation.goBack();
+    }
+  };
+
+  const uploadImage = async (uri) => {
     setUploading(true);
     try {
-      if (!photoUri) {
-        Alert.alert('Error', 'Vui lòng chụp ảnh trước.');
-        setUploading(false);
-        return;
+      if (!uri) {
+        throw new Error('Không có ảnh được chụp.');
       }
 
-      const response = await fetch(photoUri);
+      const response = await fetch(uri);
       const blob = await response.blob();
 
-      // Tạo tham chiếu đến Firebase Storage với tên file duy nhất
       const storageRef = firebase.storage().ref().child(`images/${Date.now()}_${Math.floor(Math.random() * 1000)}`);
       const snapshot = await storageRef.put(blob);
 
       const downloadURL = await snapshot.ref.getDownloadURL();
 
-      setUploading(false);
-      Alert.alert('Success', 'Ảnh đã được tải lên thành công!');
-      setPhotoUri(null);
-      console.log('Image URL:', downloadURL); // Sử dụng URL này để lưu vào cơ sở dữ liệu hoặc hiển thị trong ứng dụng
+      console.log('Image URL:', downloadURL);
+      
+      navigation.navigate('Home');
+      setTimeout(() => {
+        Alert.alert('Thành công', 'Ảnh đã được tải lên thành công!');
+      }, 500);
     } catch (error) {
-      console.error('Error uploading image:', error);
+      console.error('Lỗi khi tải ảnh lên:', error);
+      navigation.navigate('Home');
+      setTimeout(() => {
+        Alert.alert('Thất bại', 'Tải ảnh lên thất bại. Vui lòng thử lại.');
+      }, 500);
+    } finally {
       setUploading(false);
-      Alert.alert('Error', 'Tải ảnh lên thất bại.');
     }
   };
 
+  if (hasCameraPermission === null) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#0000ff" />
+        <Text style={styles.loadingText}>Đang kiểm tra quyền truy cập camera...</Text>
+      </View>
+    );
+  }
+
   return (
-    <SafeAreaView style={styles.container}>
-      <TouchableOpacity onPress={takeImage} style={styles.button}>
-        <Text style={styles.buttonText}>Chụp ảnh</Text>
-      </TouchableOpacity>
-
-      {photoUri && (
-        <Image source={{ uri: photoUri }} style={{ width: 200, height: 200, marginTop: 20 }} />
-      )}
-
-      <TouchableOpacity onPress={uploadImage} style={styles.button}>
-        <Text style={styles.buttonText}>Tải lên</Text>
-      </TouchableOpacity>
-
-      {uploading && <Text>Uploading...</Text>}
-    </SafeAreaView>
+    <View style={styles.container}>
+      <ActivityIndicator size="large" color="#0000ff" />
+      <Text style={styles.loadingText}>
+        {uploading ? 'Đang tải ảnh lên...' : 'Đang chuẩn bị chụp ảnh...'}
+      </Text>
+    </View>
   );
 }
 
@@ -95,19 +105,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#fff',
   },
-  permissionContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  button: {
-    backgroundColor: 'blue',
-    padding: 10,
+  loadingText: {
     marginTop: 10,
-  },
-  buttonText: {
-    color: 'white',
-    fontSize: 20,
+    fontSize: 16,
   },
 });
