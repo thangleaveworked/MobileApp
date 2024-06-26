@@ -33,7 +33,6 @@ export default function CameraScreen() {
     try {
       let result = await ImagePicker.launchCameraAsync({
         allowsEditing: true,
-        aspect: [6, 9],
         quality: 1,
       });
 
@@ -82,7 +81,7 @@ export default function CameraScreen() {
       setUploading(false);
     }
   };
-  const sendUrlToApi = async (url) => {
+  const sendUrlToApi = async (url: any) => {
     try {
       const response = await fetch('http://192.168.2.51:5000/api', {
         method: 'POST',
@@ -95,9 +94,19 @@ export default function CameraScreen() {
       if (!response.ok) {
         throw new Error('Failed to send URL to API');
       }
-  
+
       const data = await response.json();
       console.log('API response:', data);
+      console.log('Ngày lập hóa đơn:', data.gemini_response.ngay_lap_hoa_don);
+      console.log('Giá sản phẩm:', data.gemini_response.price[0]);
+      console.log('Số lượng mỗi sản phẩm:', data.gemini_response.so_luong_moi_san_pham[0]);
+      console.log('Tên sản phẩm:', data.gemini_response.ten_san_pham[0]);
+      console.log('Tổ chức lập hóa đơn:', data.gemini_response.to_chuc_lap_hoa_don);
+      console.log('Tổng số tiền thanh toán:', data.gemini_response.tong_so_tien_thanh_toan);
+      console.log('Thông điệp:', data.message);
+
+
+
     } catch (error) {
       console.error('Error sending URL to API:', error);
       Alert.alert('Error', 'Gửi URL đến API thất bại.');
