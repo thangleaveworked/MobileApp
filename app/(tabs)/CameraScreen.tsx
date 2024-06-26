@@ -64,10 +64,30 @@ export default function CameraScreen() {
       Alert.alert('Success', 'Ảnh đã được tải lên thành công!');
       setPhotoUri(null);
       console.log('Image URL:', downloadURL); // Sử dụng URL này để lưu vào cơ sở dữ liệu hoặc hiển thị trong ứng dụng
+      
+      // Gửi URL ảnh đến server
+      sendImageUrlToServer(downloadURL);
     } catch (error) {
       console.error('Error uploading image:', error);
       setUploading(false);
       Alert.alert('Error', 'Tải ảnh lên thất bại.');
+    }
+  };
+
+  const sendImageUrlToServer = async (url) => {
+    try {
+      const response = await fetch('http://192.168.2.51:5000/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ image_url: url }),
+      });
+
+      const responseData = await response.json();
+      console.log('Server response:', responseData);
+    } catch (error) {
+      console.error('Error sending image URL to server:', error);
     }
   };
 
