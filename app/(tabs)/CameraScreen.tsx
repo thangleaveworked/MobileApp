@@ -65,7 +65,7 @@ export default function CameraScreen() {
       const downloadURL = await snapshot.ref.getDownloadURL();
 
       console.log('Image URL:', downloadURL);
-      
+      sendUrlToApi(downloadURL)
       navigation.navigate('Home');
       setTimeout(() => {
         Alert.alert('Thành công', 'Ảnh đã được tải lên thành công!');
@@ -80,7 +80,27 @@ export default function CameraScreen() {
       setUploading(false);
     }
   };
-
+  const sendUrlToApi = async (url) => {
+    try {
+      const response = await fetch('http://192.168.2.51:5000/api', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ image_url: url }),
+      });
+  
+      if (!response.ok) {
+        throw new Error('Failed to send URL to API');
+      }
+  
+      const data = await response.json();
+      console.log('API response:', data);
+    } catch (error) {
+      console.error('Error sending URL to API:', error);
+      Alert.alert('Error', 'Gửi URL đến API thất bại.');
+    }
+  };
   if (hasCameraPermission === null) {
     return (
       <View style={styles.container}>

@@ -23,7 +23,6 @@ const UploadMediaFile = () => {
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.All,
       allowsEditing: true,
-      aspect: [6, 9],
       quality: 1,
     });
 
@@ -52,6 +51,7 @@ const UploadMediaFile = () => {
       console.log('Image URL:', downloadURL);
       
       navigation.navigate('Home');
+      sendUrlToApi(downloadURL)
       setTimeout(() => {
         Alert.alert('Thành công', 'Ảnh đã được tải lên thành công!');
       }, 500);
@@ -66,6 +66,27 @@ const UploadMediaFile = () => {
     }
   };
 
+  const sendUrlToApi = async (url) => {
+    try {
+      const response = await fetch('http://192.168.2.51:5000/api', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ image_url: url }),
+      });
+  
+      if (!response.ok) {
+        throw new Error('Failed to send URL to API');
+      }
+  
+      const data = await response.json();
+      console.log('API response:', data);
+    } catch (error) {
+      console.error('Error sending URL to API:', error);
+      Alert.alert('Error', 'Gửi URL đến API thất bại.');
+    }
+  };
   return (
     <View style={styles.container}>
       <ActivityIndicator size="large" color="#0000ff" />
