@@ -2,13 +2,13 @@
 import firebase from 'firebase/compat/app';
 import 'firebase/compat/storage';
 const firebaseConfig = {
-  apiKey: "AIzaSyC-RcfJiO18l4Z2kQ6d2xh1cZBU-9wy-20",
-  authDomain: "thuctap-58e60.firebaseapp.com",
-  projectId: "thuctap-58e60",
-  storageBucket: "thuctap-58e60.appspot.com",
-  messagingSenderId: "535619409524",
-  appId: "1:535619409524:web:2d1229e9db2b491c65e321",
-  measurementId: "G-FKFGC42KCH"
+  apiKey: "AIzaSyB710sMP_Mu5QrgL9-tlps6kg1-8BYxC3I",
+  authDomain: "thuctap-f37c9.firebaseapp.com",
+  projectId: "thuctap-f37c9",
+  storageBucket: "thuctap-f37c9.appspot.com",
+  messagingSenderId: "1004691222880",
+  appId: "1:1004691222880:web:1e2d04dc0e995caa35ee05",
+  measurementId: "G-53KVV3X53D"
 };
 if (!firebase.apps.length) {
   firebase.initializeApp(firebaseConfig);

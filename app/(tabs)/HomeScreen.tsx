@@ -18,15 +18,15 @@ const transactions = [
 const HomeScreen = () => {
   const navigation = useNavigation();
 
-  const handleItemPress = (item) => {
+  const handleItemPress = (item : any) => {
     alert(`Bạn đã chọn ${item.name}: ${item.amount}`);
   };
 
   const navigateToCamera = () => {
-    navigation.navigate('Camera');
+    navigation.navigate('Camera' as never);
   };
   const navigateToPhoto = () => {
-    navigation.navigate('ListPhotos');
+    navigation.navigate('ListPhotos' as never);
   };
 
   return (
