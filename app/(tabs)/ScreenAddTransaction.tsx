@@ -1,18 +1,59 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, Dimensions, Alert, TextInput } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { RouteProp, useRoute } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const ScreenAddTransaction = () => {
-  const navigation = useNavigation();
-  const route = useRoute();
+type RootStackParamList = {
+  ScreenOverView: undefined;
+  CameraScreen: undefined;
+  AddDescription: { description: string };
+  ListPhotosScreen: undefined;
+  ExpenseCategoriesScreen: undefined;
+  AddNoteScreen: { note: string };
+  ScreenAddTransaction: {
+    invoiceData?: {
+      total_amount: number;
+      date: string;
+      description: string;
+      ghichu: string;
+    };
+    note?: string;
+    description?: string;
+    category?: Category;
+    isExpense?: boolean;
+  };
+};
+
+type ScreenAddTransactionProps = {
+  navigation: StackNavigationProp<RootStackParamList, 'ScreenAddTransaction'>;
+};
+
+type Category = {
+  name: string;
+  icon: string;
+  isExpense: boolean | null;
+  id?: string;
+};
+
+type UserData = {
+  user_id: string;
+  amount: string;
+  categories: string;
+  transactions: string;
+  wallet: string;
+  notification: string;
+};
+
+const ScreenAddTransaction: React.FC<ScreenAddTransactionProps> = ({ navigation }) => {
+  const route = useRoute<RouteProp<RootStackParamList, 'ScreenAddTransaction'>>();
   const [amount, setAmount] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isValidDate, setIsValidDate] = useState(true);
-  const [category, setCategory] = useState({ name: 'Chọn nhóm', icon: 'help-circle-outline', isExpense: null });
+  const [category, setCategory] = useState<Category>({ name: 'Chọn nhóm', icon: 'help-circle-outline', isExpense: null });
   const [note, setNote] = useState('');
   const [description, setDescription] = useState('');
 
@@ -48,22 +89,22 @@ const ScreenAddTransaction = () => {
     if (route.params?.category) {
       setCategory({
         ...route.params.category,
-        isExpense: route.params.isExpense,
+        isExpense: route.params.isExpense ?? null,
       });
     }
-  }, [route.params?.category]);
+  }, [route.params?.category, route.params?.isExpense]);
 
-  const isValidDateFormat = (dateString) => {
+  const isValidDateFormat = (dateString: string): boolean => {
     const regex = /^\d{2}\/\d{2}\/\d{4}$/;
     return regex.test(dateString);
   };
 
-  const parseDate = (dateString) => {
+  const parseDate = (dateString: string): Date => {
     const [day, month, year] = dateString.split('/');
     return new Date(`${year}-${month}-${day}`);
   };
 
-  const sendDataToServer = async (data) => {
+  const sendDataToServer = async (data: any): Promise<any> => {
     try {
       console.log('Sending data to server:', data);
       const response = await fetch('http://192.168.2.24:5000/api', {
@@ -89,7 +130,7 @@ const ScreenAddTransaction = () => {
     }
   };
 
-  const formatNumber = (num: any) => {
+  const formatNumber = (num: string): string => {
     num = num.replace(/[^\d.]/g, '');
     const parts = num.split('.');
     if (parts.length > 2) {
@@ -99,44 +140,46 @@ const ScreenAddTransaction = () => {
     return parts.join('.');
   };
 
-  const handleClearPress = () => {
+  const handleClearPress = (): void => {
     setAmount('0');
   };
 
-  const handleAmountChange = (text) => {
+  const handleAmountChange = (text: string): void => {
     const formattedValue = formatNumber(text);
     setAmount(formattedValue);
   };
 
-  const navigateToCamera = () => {
+  const navigateToCamera = (): void => {
     navigation.navigate('CameraScreen');
   };
 
-  const navigateToAddDescriptionScreen = () => {
+  const navigateToAddDescriptionScreen = (): void => {
     navigation.navigate('AddDescription', { description });
   };
 
-  const navigateToPhoto = () => {
-    navigation.navigate('ListPhotosScreen' as never);
+  const navigateToPhoto = (): void => {
+    navigation.navigate('ListPhotosScreen');
   };
-  const hasInvalidCharacters = (text : any) => {
+
+  const hasInvalidCharacters = (text: string): boolean => {
     const invalidChars = /[^0-9,]/;
     return invalidChars.test(text);
   };
-  const navigateExpenseCategoriesScreen = () => {
+
+  const navigateExpenseCategoriesScreen = (): void => {
     navigation.navigate('ExpenseCategoriesScreen');
   };
 
-  const navigateToAddNoteScreen = () => {
+  const navigateToAddNoteScreen = (): void => {
     navigation.navigate('AddNoteScreen', { note });
   };
 
-  const isFormValid = () => {
+  const isFormValid = (): boolean => {
     const amountValue = parseFloat(amount.replace(/,/g, ''));
     return amountValue > 0 && category.id !== undefined;
   };
 
-  const handleSave = async () => {
+  const handleSave = async (): Promise<void> => {
     if (isFormValid()) {
       if (hasInvalidCharacters(amount)) {
         Alert.alert('Lỗi', 'Số tiền chứa ký tự không hợp lệ. Vui lòng chỉ sử dụng số và dấu phẩy.');
@@ -147,7 +190,7 @@ const ScreenAddTransaction = () => {
         if (!userDataString) {
           throw new Error('User data not found. Please log in again.');
         }
-        let userData = JSON.parse(userDataString);
+        let userData: UserData = JSON.parse(userDataString);
   
         const data = {
           type: "insert_transactions",
@@ -155,8 +198,8 @@ const ScreenAddTransaction = () => {
           amount: amount.replace(/,/g, ''),
           category_id: category.id,
           date: isValidDate ? selectedDate.toLocaleDateString('en-GB') : "",
-          note: note || "", // Gửi chuỗi rỗng nếu không có ghi chú
-          description: description || "", // Gửi chuỗi rỗng nếu không có mô tả
+          note: note || "",
+          description: description || "",
           transaction_type: category.isExpense ? "expense" : "income"
         };
   
@@ -174,8 +217,8 @@ const ScreenAddTransaction = () => {
   
         await AsyncStorage.setItem('userData', JSON.stringify(userData));
   
-        navigation.navigate('ScreenOverView' as never);
-      } catch (error : any) {
+        navigation.navigate('ScreenOverView');
+      } catch (error: any) {
         console.error('Error saving transaction:', error);
         Alert.alert('Lỗi', error.message || 'Đã xảy ra lỗi khi lưu giao dịch.');
       }
@@ -184,7 +227,7 @@ const ScreenAddTransaction = () => {
     }
   };
 
-  const getCategoryIconColor = () => {
+  const getCategoryIconColor = (): string => {
     if (category.isExpense === null) {
       return '#888888';
     }

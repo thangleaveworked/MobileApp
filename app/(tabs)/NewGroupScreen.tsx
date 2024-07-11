@@ -2,18 +2,27 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, StatusBar, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
 const STORAGE_KEY = '@categories_screen';
 
-const NewGroupScreen = () => {
+type RootStackParamList = {
+  NewGroupScreen: { selectedIcon?: string; isExpense?: boolean };
+  IconSelectionScreen: { currentIcon: string };
+  ExpenseCategoriesScreen: { newCategory: any };
+};
+
+type NewGroupScreenRouteProp = RouteProp<RootStackParamList, 'NewGroupScreen'>;
+
+const NewGroupScreen: React.FC = () => {
   const navigation = useNavigation();
-  const route = useRoute();
+  const route = useRoute<NewGroupScreenRouteProp>();
   const [selectedIcon, setSelectedIcon] = useState('');
   const [groupName, setGroupName] = useState('');
   const [isExpense, setIsExpense] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [userId, setUserId] = useState(null);
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
     if (route.params?.selectedIcon) {
@@ -23,7 +32,6 @@ const NewGroupScreen = () => {
       setIsExpense(route.params.isExpense);
     }
     
-    // Fetch user data when component mounts
     fetchUserData();
   }, [route.params]);
 
@@ -40,7 +48,7 @@ const NewGroupScreen = () => {
   };
 
   const handleIconPress = () => {
-    navigation.navigate('IconSelectionScreen', { currentIcon: selectedIcon });
+    navigation.navigate('IconSelectionScreen' as never, { currentIcon: selectedIcon } as never);
   };
 
   const handleSave = async () => {
@@ -73,8 +81,8 @@ const NewGroupScreen = () => {
       const result = await response.json();
 
       await saveCategories(result);
-      const newCategory = result[result.length - 1]; // Lấy category mới nhất
-      navigation.navigate('ExpenseCategoriesScreen', { newCategory });
+      const newCategory = result[result.length - 1];
+      navigation.navigate('ExpenseCategoriesScreen' as never, { newCategory } as never);
     } catch (error) {
       console.error('Error saving new group:', error);
       Alert.alert('Lỗi', 'Không thể lưu nhóm mới. Vui lòng thử lại sau.');
@@ -82,9 +90,9 @@ const NewGroupScreen = () => {
       setIsSaving(false);
     }
   };
-  const saveCategories = async (categories) => {
+
+  const saveCategories = async (categories: any) => {
     try {
-      // Đảm bảo categories là một mảng trước khi lưu
       const categoriesToSave = Array.isArray(categories) ? categories : [categories];
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(categoriesToSave));
       console.log('Categories saved to AsyncStorage:', categoriesToSave);
@@ -92,6 +100,7 @@ const NewGroupScreen = () => {
       console.error('Error saving categories to AsyncStorage:', error);
     }
   };
+
   const isSaveDisabled = !selectedIcon || !groupName.trim();
 
   return (
@@ -135,11 +144,11 @@ const NewGroupScreen = () => {
         </View>
 
         <TouchableOpacity
-          style={[styles.saveButton, isSaveDisabled && styles.saveButtonDisabled, { backgroundColor: isExpense ? '#4CAF50' : '#4CAF50' }]}
+          style={[styles.saveButton, isSaveDisabled && styles.saveButtonDisabled, { backgroundColor: '#4CAF50' }]}
           onPress={handleSave}
-          disabled={isSaveDisabled}
+          disabled={isSaveDisabled || isSaving}
         >
-          <Text style={styles.saveButtonText}>Lưu</Text>
+          <Text style={styles.saveButtonText}>{isSaving ? 'Đang lưu...' : 'Lưu'}</Text>
         </TouchableOpacity>
       </SafeAreaView>
     </>

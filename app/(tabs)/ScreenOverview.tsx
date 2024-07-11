@@ -1,15 +1,45 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Platform, Dimensions } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, NavigationProp } from '@react-navigation/native'; // Updated import
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
 const { width, height } = Dimensions.get('window');
 
-const ScreenOverView = () => {
-    const navigation = useNavigation();
-    const [userData, setUserData] = useState(null);
+type RootStackParamList = {
+  DetailTransaction: { transactionData: any };
+  ScreenAccountManagement: { userData: UserData };
+  ScreenAddTransaction: undefined;
+  NotificationScreen: { notifications: { message: string; time: string }[] };
+};
+
+type ScreenOverViewProps = {
+  navigation: NavigationProp<RootStackParamList>; // Updated type usage
+};
+
+type UserData = {
+  notification?: string;
+  transactions: string;
+  categories: string;
+};
+
+type Transaction = {
+  type: 'income' | 'expense';
+  amount: number;
+  date: string;
+  category_id: string;
+  note: string;
+};
+
+type Category = {
+  category_id: string;
+  category_name: string;
+  category_icon: string;
+};
+
+const ScreenOverView: React.FC<ScreenOverViewProps> = ({ navigation }) => {
+    const [userData, setUserData] = useState<UserData | null>(null);
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [filterType, setFilterType] = useState('all');
@@ -20,7 +50,7 @@ const ScreenOverView = () => {
             try {
                 const userDataString = await AsyncStorage.getItem('userData');
                 if (userDataString !== null) {
-                    const userDataObject = JSON.parse(userDataString);
+                    const userDataObject: UserData = JSON.parse(userDataString);
                     setUserData(userDataObject);
                     setHasNotification(!!userDataObject.notification);
                 }
@@ -38,7 +68,7 @@ const ScreenOverView = () => {
         return unsubscribe;
     }, [navigation]);
 
-    const onDateChange = (_event: any, selectedDate: Date | null) => {
+    const onDateChange = (_event: DateTimePickerEvent, selectedDate?: Date) => {
         if (selectedDate) {
             const currentDate = new Date(selectedDate);
             currentDate.setDate(1); // Set to first day of the month
@@ -48,7 +78,7 @@ const ScreenOverView = () => {
         }
     };
 
-    const handleTransactionPress = (transaction:any, category:any) => {
+    const handleTransactionPress = (transaction: Transaction, category: Category | undefined) => {
         navigation.navigate('DetailTransaction', {
             transactionData: {
                 ...transaction,
@@ -57,7 +87,7 @@ const ScreenOverView = () => {
         });
     };
 
-    const filterTransactions = (transactions:any) => {
+    const filterTransactions = (transactions: Transaction[]) => {
         if (filterType === 'all') {
             return transactions;
         } if (filterType === 'current') {
@@ -76,12 +106,15 @@ const ScreenOverView = () => {
             });
         }
     };
+
     const handleAccountPress = () => {
-        navigation.navigate('ScreenAccountManagement', { userData: userData });
+        if (userData) {
+            navigation.navigate('ScreenAccountManagement', { userData: userData });
+        }
     };
 
     const handleAddTransaction = () => {
-        navigation.navigate('ScreenAddTransaction'as never);
+        navigation.navigate('ScreenAddTransaction');
     };
 
     const handleNotificationPress = () => {
@@ -98,19 +131,20 @@ const ScreenOverView = () => {
         return <Text>Loading...</Text>;
     }
 
-    const transactions = JSON.parse(userData.transactions);
-    const categories = JSON.parse(userData.categories);
+    const transactions: Transaction[] = JSON.parse(userData.transactions);
+    const categories: Category[] = JSON.parse(userData.categories);
 
     const filteredTransactions = filterTransactions(transactions);
 
     const totalIncome = filteredTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
     const totalExpense = filteredTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
     const balance = totalIncome - totalExpense;
-    const allTransactions = JSON.parse(userData.transactions);
+    const allTransactions: Transaction[] = JSON.parse(userData.transactions);
     const totalFixedIncome = allTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
     const totalFixedExpense = allTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
     const fixedBalance = totalFixedIncome - totalFixedExpense;
-    const groupedTransactions = filteredTransactions.reduce((groups, transaction) => {
+    
+    const groupedTransactions = filteredTransactions.reduce((groups: { [key: string]: Transaction[] }, transaction: Transaction) => {
         const date = transaction.date;
         if (!groups[date]) {
             groups[date] = [];

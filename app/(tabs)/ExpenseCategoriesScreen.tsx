@@ -2,17 +2,37 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const STORAGE_KEY = '@categories_screen';
+type RootStackParamList = {
+  ExpenseCategoriesScreen: { newCategory?: any };
+  NewGroupScreen: { isExpense: boolean };
+  ScreenAddTransaction: { 
+    category: { 
+      name: string; 
+      icon: string; 
+      id: string 
+    };
+    isExpense: boolean;
+  };
+};
 
-const ExpenseCategoriesScreen = () => {
-  const [activeTab, setActiveTab] = useState('spend');
-  const [spendCategories, setSpendCategories] = useState([]);
-  const [collectCategories, setCollectCategories] = useState([]);
+type ExpenseCategoriesScreenRouteProp = RouteProp<RootStackParamList, 'ExpenseCategoriesScreen'>;
+
+type Category = {
+  category_id: string;
+  category_name: string;
+  category_icon: string;
+  category_type: 'expense' | 'income';
+};
+
+const ExpenseCategoriesScreen: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<'spend' | 'collect'>('spend');
+  const [spendCategories, setSpendCategories] = useState<Category[]>([]);
+  const [collectCategories, setCollectCategories] = useState<Category[]>([]);
   const navigation = useNavigation();
-  const route = useRoute();
+  const route = useRoute<ExpenseCategoriesScreenRouteProp>();
 
   useEffect(() => {
     loadCategories();
@@ -31,7 +51,7 @@ const ExpenseCategoriesScreen = () => {
       if (userDataJson != null) {
         const userData = JSON.parse(userDataJson);
         const categoriesJson = userData.categories;
-        const allCategories = JSON.parse(categoriesJson);
+        const allCategories: Category[] = JSON.parse(categoriesJson);
   
         if (Array.isArray(allCategories)) {
           const spend = allCategories.filter(cat => cat.category_type === 'expense');
@@ -59,14 +79,14 @@ const ExpenseCategoriesScreen = () => {
     ));
   };
 
-  const handleCategorySelect = (category: any) => {
+  const handleCategorySelect = (category: Category) => {
     navigation.navigate('ScreenAddTransaction', {
       category: {
-        name: category.category_name, // category_icon
-        icon: category.category_icon, // category_name
+        name: category.category_name,
+        icon: category.category_icon,
         id: category.category_id
       },
-      isExpense: category.category_type === 'expense' // category_type
+      isExpense: category.category_type === 'expense'
     });
   };
 
@@ -96,11 +116,14 @@ const ExpenseCategoriesScreen = () => {
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity style={styles.newGroupButton} onPress={() => {
-          navigation.navigate('NewGroupScreen', {
-            isExpense: activeTab === 'spend'
-          });
-        }}>
+        <TouchableOpacity 
+          style={styles.newGroupButton} 
+          onPress={() => {
+            navigation.navigate('NewGroupScreen', {
+              isExpense: activeTab === 'spend'
+            });
+          }}
+        >
           <Icon name="plus-circle-outline" size={24} color={activeTab === 'spend' ? '#4CAF50' : '#4CAF50'} />
           <Text style={[styles.newGroupText, { color: activeTab === 'spend' ? '#4CAF50' : '#4CAF50' }]}>NHÓM MỚI</Text>
         </TouchableOpacity>
@@ -112,6 +135,7 @@ const ExpenseCategoriesScreen = () => {
     </>
   );
 };
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,

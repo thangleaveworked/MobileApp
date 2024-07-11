@@ -3,18 +3,38 @@ import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, Alert } fr
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { RouteProp } from '@react-navigation/native';
 
 const { width, height } = Dimensions.get('window');
 
-const ScreenAccountManagement = ({ route, navigation }) => {
+type RootStackParamList = {
+  AuthScreen: undefined;
+  ScreenOverView: undefined;
+  ScreenAddTransaction: undefined;
+  ScreenAccountManagement: { userData: UserData; onLogout: () => void };
+};
+
+type UserData = {
+  user_id: string;
+  user_name: string;
+  user_email: string;
+};
+
+type ScreenAccountManagementProps = {
+  route: RouteProp<RootStackParamList, 'ScreenAccountManagement'>;
+  navigation: StackNavigationProp<RootStackParamList, 'ScreenAccountManagement'>;
+};
+
+const ScreenAccountManagement: React.FC<ScreenAccountManagementProps> = ({ route, navigation }) => {
     const { userData, onLogout } = route.params;
-    const [profileImage, setProfileImage] = useState(null);
+    const [profileImage, setProfileImage] = useState<string | null>(null);
 
     useEffect(() => {
         loadProfileImage();
     }, []);
 
-    const loadProfileImage = async () => {
+    const loadProfileImage = async (): Promise<void> => {
         try {
             const savedImage = await AsyncStorage.getItem(`profileImage_${userData.user_id}`);
             if (savedImage) {
@@ -25,7 +45,7 @@ const ScreenAccountManagement = ({ route, navigation }) => {
         }
     };
 
-    const handleChangeProfilePicture = async () => {
+    const handleChangeProfilePicture = async (): Promise<void> => {
         const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
         
         if (permissionResult.granted === false) {
@@ -51,19 +71,19 @@ const ScreenAccountManagement = ({ route, navigation }) => {
         }
     };
 
-    const handleAccountInfoPress = () => {
+    const handleAccountInfoPress = (): void => {
         console.log('Account info pressed');
     };
 
-    const handleChangePassword = () => {
+    const handleChangePassword = (): void => {
         console.log('Change password pressed');
     };
 
-    const handleDeleteAccount = () => {
+    const handleDeleteAccount = (): void => {
         console.log('Delete account pressed');
     };
 
-    const handleLogout = async () => {
+    const handleLogout = async (): Promise<void> => {
         try {
             await AsyncStorage.removeItem('userToken');
             navigation.navigate('AuthScreen');
@@ -72,11 +92,11 @@ const ScreenAccountManagement = ({ route, navigation }) => {
         }
     };
 
-    const handleOverviewPress = () => {
+    const handleOverviewPress = (): void => {
         navigation.navigate('ScreenOverView');
     };
 
-    const handleAddTransaction = () => {
+    const handleAddTransaction = (): void => {
         navigation.navigate('ScreenAddTransaction');
     };
 
@@ -139,7 +159,7 @@ const ScreenAccountManagement = ({ route, navigation }) => {
     );
 };
 
-const scaledSize = (size) => {
+const scaledSize = (size:any) => {
     const scale = Math.min(width, height) / 375;
     return Math.round(size * scale);
 };

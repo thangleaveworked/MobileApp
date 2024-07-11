@@ -4,7 +4,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
 
-const iconData = [
+type IconItem = {
+  name: string;
+  label: string;
+};
+
+const iconData: IconItem[] = [
   'heart', 'food-fork-drink', 'basket', 'calculator', 'airplane',
   'home', 'cart', 'store', 'cellphone', 'ring',
   'church', 'bus-side', 'motorbike', 'medical-bag', 'coffee',
@@ -15,14 +20,14 @@ const iconData = [
   'ice-cream', 'baby-carriage', 'email', 'wheelchair-accessibility', 'music',
 ].map(name => ({ name, label: name.replace(/-/g, ' ') }));
 
-const IconSelectionScreen = () => {
+const IconSelectionScreen: React.FC = () => {
   const navigation = useNavigation();
 
-  const handleIconSelect = (iconName : any) => {
-    navigation.navigate('NewGroupScreen', { selectedIcon: iconName });
+  const handleIconSelect = (iconName: string) => {
+    navigation.navigate('NewGroupScreen' as never, { selectedIcon: iconName } as never);
   };
 
-  const renderIcon = ({ item }: any) => (
+  const renderIcon = ({ item }: { item: IconItem }) => (
     <TouchableOpacity 
       style={styles.iconContainer}
       onPress={() => handleIconSelect(item.name)}
@@ -30,7 +35,7 @@ const IconSelectionScreen = () => {
       <View style={styles.iconCircle}>
         <Icon name={item.name} size={24} color="#FFF" />
       </View>
-      <Text style={styles.iconLabel}></Text>
+      <Text style={styles.iconLabel}>{item.label}</Text>
     </TouchableOpacity>
   );
 
@@ -44,8 +49,6 @@ const IconSelectionScreen = () => {
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Chọn biểu tượng</Text>
         </View>
-
-       
 
         <FlatList
           data={iconData}
@@ -80,16 +83,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
   },
-  tabContainer: {
-    padding: 16,
-    borderBottomWidth: 2,
-    borderBottomColor: '#000',
-  },
-  tabText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
   iconGrid: {
     padding: 16,
   },
@@ -109,7 +102,11 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     backgroundColor: '#4CAF50',
   },
- 
+  iconLabel: {
+    fontSize: 12,
+    textAlign: 'center',
+    color: '#000',
+  },
 });
 
 export default IconSelectionScreen;

@@ -1,9 +1,24 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, RouteProp } from '@react-navigation/native';
 
-const NotificationScreen = ({ route }) => {
+type RootStackParamList = {
+  NotificationScreen: { notifications: Notification[] };
+};
+
+type NotificationScreenRouteProp = RouteProp<RootStackParamList, 'NotificationScreen'>;
+
+type Notification = {
+  message: string;
+  time: string;
+};
+
+type NotificationScreenProps = {
+  route: NotificationScreenRouteProp;
+};
+
+const NotificationScreen: React.FC<NotificationScreenProps> = ({ route }) => {
   const navigation = useNavigation();
   const { notifications } = route.params;
 
