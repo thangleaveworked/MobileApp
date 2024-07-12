@@ -162,8 +162,11 @@ const ScreenOverView: React.FC<ScreenOverViewProps> = ({ navigation }) => {
             <View style={styles.header}>
                 <View style={styles.headerTop}>
                     <Image source={require('../../assets/images/logodomdomnenxanh.png')} style={styles.logo} />
-                    <Text style={styles.balance}>
-                    {userData.amount ? ((userData as any).amount < 0 ? '-' : '') + Math.abs((userData as any).amount).toLocaleString() : '0'} đ                    </Text>
+                    <View style={styles.balanceContainer}>
+                        <Text style={styles.balance}>
+                            {userData.amount ? ((userData as any).amount < 0 ? '-' : '') + Math.abs((userData as any).amount).toLocaleString() : '0'} đ
+                        </Text>
+                    </View>
                     <TouchableOpacity onPress={handleNotificationPress} style={styles.notificationContainer}>
                         <Icon name="bell" size={width * 0.08} color="#fff" />
                         {hasNotification && <View style={styles.notificationBadge} />}
@@ -288,13 +291,26 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
     },
+    balanceContainer: {
+        flex: 1,  // This will make the container take up all available space
+        alignItems: 'center',  // This will center the balance text horizontally
+        justifyContent: 'center',  // This will center the balance text vertically
+    },
     balance: {
         color: '#fff',
         fontSize: width * 0.06,
         fontWeight: 'bold',
+        textAlign: 'center',  // This ensures the text itself is centered
+    },
+    logo: {
+        width: width * 0.15,
+        height: width * 0.15,
+        resizeMode: 'contain',
     },
     notificationContainer: {
         position: 'relative',
+        width: width * 0.15,  // Match the width of the logo for symmetry
+        alignItems: 'flex-end',  // Align the icon to the right
     },
     notificationBadge: {
         position: 'absolute',
@@ -423,11 +439,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 25,
-    },
-    logo: {
-        width: width * 0.15,  // Adjust size as needed
-        height: width * 0.15,  // Adjust size as needed
-        resizeMode: 'contain',
     },
     headerImage: {
         width: width * 0.08,  // Adjust size as needed
