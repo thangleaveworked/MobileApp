@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, Alert, TextInput } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -19,6 +19,8 @@ type UserData = {
   user_id: string;
   user_name: string;
   user_email: string;
+  amount: number;  // Tổng tiền của ví
+  wallet: number;  // Số dư hiện tại
 };
 
 type ScreenAccountManagementProps = {
@@ -27,12 +29,26 @@ type ScreenAccountManagementProps = {
 };
 
 const ScreenAccountManagement: React.FC<ScreenAccountManagementProps> = ({ route, navigation }) => {
-    const { userData, onLogout } = route.params;
+    const [userData, setUserData] = useState<UserData>(route.params.userData);
     const [profileImage, setProfileImage] = useState<string | null>(null);
+    const [newPassword, setNewPassword] = useState('');
+    const [showPasswordInput, setShowPasswordInput] = useState(false);
+    const [walletBalance, setWalletBalance] = useState('');
+    const [showWalletInput, setShowWalletInput] = useState(false);
 
     useEffect(() => {
         loadProfileImage();
     }, []);
+
+    const formatNumber = (num: string): string => {
+        num = num.replace(/[^\d.]/g, '');
+        const parts = num.split('.');
+        if (parts.length > 2) {
+            num = parts[0] + '.' + parts.slice(1).join('');
+        }
+        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        return parts.join('.');
+    };
 
     const loadProfileImage = async (): Promise<void> => {
         try {
@@ -41,7 +57,7 @@ const ScreenAccountManagement: React.FC<ScreenAccountManagementProps> = ({ route
                 setProfileImage(savedImage);
             }
         } catch (error) {
-            console.error('Error loading profile image:', error);
+            console.log('Error loading profile image:', error);
         }
     };
 
@@ -66,7 +82,7 @@ const ScreenAccountManagement: React.FC<ScreenAccountManagementProps> = ({ route
             try {
                 await AsyncStorage.setItem(`profileImage_${userData.user_id}`, newImageUri);
             } catch (error) {
-                console.error('Error saving profile image:', error);
+                console.log('Error saving profile image:', error);
             }
         }
     };
@@ -75,20 +91,101 @@ const ScreenAccountManagement: React.FC<ScreenAccountManagementProps> = ({ route
         console.log('Account info pressed');
     };
 
-    const handleChangePassword = (): void => {
-        console.log('Change password pressed');
+    const handleChangePassword = async (): Promise<void> => {
+        if (showPasswordInput) {
+            if (newPassword.length < 8) {
+                Alert.alert("Lỗi", "Mật khẩu phải có ít nhất 8 ký tự");
+                return;
+            }
+
+            try {
+                const response = await fetch('http://192.168.2.23:5000/api', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        type: "update_password",
+                        email: userData.user_email,
+                        password: newPassword
+                    })
+                });
+                if (response.ok) {
+                    Alert.alert(
+                        "Thành công",
+                        "Mật khẩu đã được cập nhật thành công.",
+                        [{ text: "OK", onPress: () => setShowPasswordInput(false) }]
+                    );
+                    setNewPassword('');
+                } else {
+                    throw new Error('Lỗi khi cập nhật mật khẩu');
+                }
+            } catch (error) {
+                console.log('Lỗi:', error);
+                Alert.alert("Lỗi", "Không thể cập nhật mật khẩu. Vui lòng thử lại sau.");
+            }
+        } else {
+            setShowPasswordInput(true);
+        }
     };
 
-    const handleDeleteAccount = (): void => {
-        console.log('Delete account pressed');
+    const handleUpdateWallet = async (): Promise<void> => {
+        if (showWalletInput) {
+            const unformattedBalance = walletBalance.replace(/,/g, '');
+            if (isNaN(Number(unformattedBalance)) || Number(unformattedBalance) < 0) {
+                Alert.alert("Lỗi", "Vui lòng nhập số dư hợp lệ.");
+                return;
+            }
+
+            try {
+                const newWalletBalance = Number(unformattedBalance);
+                const newAmount = userData.amount + (newWalletBalance - userData.wallet);
+
+                const response = await fetch('http://192.168.2.23:5000/api', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        type: "update_wallet",
+                        user_id: userData.user_id,
+                        wallet: newWalletBalance
+                    })
+                });
+
+                if (response.ok) {
+                    const updatedUserData = {
+                        ...userData,
+                        wallet: newWalletBalance,
+                        amount: newAmount
+                    };
+                    setUserData(updatedUserData);
+                    await AsyncStorage.setItem('userData', JSON.stringify(updatedUserData));
+                    Alert.alert(
+                        "Thành công",
+                        "Số dư ví tiền mặt đã được cập nhật thành công.",
+                        [{ text: "OK", onPress: () => setShowWalletInput(false) }]
+                    );
+                    setWalletBalance('');
+                } else {
+                    throw new Error('Lỗi khi cập nhật ví tiền mặt');
+                }
+            } catch (error) {
+                console.error('Lỗi:', error);
+                Alert.alert("Lỗi", "Không thể cập nhật ví tiền mặt. Vui lòng thử lại sau.");
+            }
+        } else {
+            setShowWalletInput(true);
+        }
     };
+
 
     const handleLogout = async (): Promise<void> => {
         try {
             await AsyncStorage.removeItem('userToken');
             navigation.navigate('AuthScreen');
         } catch (error) {
-            console.error('Error during logout:', error);
+            console.log('Error during logout:', error);
         }
     };
 
@@ -126,20 +223,54 @@ const ScreenAccountManagement: React.FC<ScreenAccountManagementProps> = ({ route
                 </View>
             </TouchableOpacity>
 
+            <View style={styles.walletInfo}>
+                <Icon name="wallet" size={scaledSize(24)} color="#4CAF50" />
+                <Text style={styles.walletBalanceText}>
+                    Số dư ví hiện tại: {userData.wallet !== undefined ? formatNumber(userData.wallet.toString()) : '0'} VNĐ
+                </Text>
+            </View>
+
+            {showPasswordInput && (
+                <View style={styles.inputContainer}>
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Nhập mật khẩu mới"
+                        secureTextEntry
+                        value={newPassword}
+                        onChangeText={setNewPassword}
+                    />
+                </View>
+            )}
+
             <TouchableOpacity style={styles.optionButton} onPress={handleChangePassword}>
                 <Icon name="lock-reset" size={scaledSize(20)} color="#000" />
-                <Text style={styles.optionText}>Thay đổi mật khẩu</Text>
+                <Text style={styles.optionText}>
+                    {showPasswordInput ? "Xác nhận đổi mật khẩu" : "Thay đổi mật khẩu"}
+                </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.optionButton} onPress={handleDeleteAccount}>
-                <Icon name="delete" size={scaledSize(20)} color="#000" />
-                <Text style={styles.optionText}>Xóa tài khoản</Text>
+            {showWalletInput && (
+                <View style={styles.inputContainer}>
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Nhập số dư ví tiền mặt"
+                        keyboardType="numeric"
+                        value={walletBalance}
+                        onChangeText={(text) => setWalletBalance(formatNumber(text))}
+                    />
+                </View>
+            )}
+
+            <TouchableOpacity style={styles.optionButton} onPress={handleUpdateWallet}>
+                <Icon name="wallet" size={scaledSize(20)} color="#000" />
+                <Text style={styles.optionText}>
+                    {showWalletInput ? "Xác nhận cập nhật ví" : "Cập nhật ví tiền mặt"}
+                </Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
                 <Text style={styles.logoutButtonText}>Đăng xuất</Text>
             </TouchableOpacity>
-
             <View style={styles.tabBar}>
                 <TouchableOpacity style={styles.tabItem} onPress={handleOverviewPress}>
                     <Icon name="home" size={24} color="#757575" />
@@ -159,7 +290,8 @@ const ScreenAccountManagement: React.FC<ScreenAccountManagementProps> = ({ route
     );
 };
 
-const scaledSize = (size:any) => {
+
+const scaledSize = (size: number) => {
     const scale = Math.min(width, height) / 375;
     return Math.round(size * scale);
 };
@@ -227,6 +359,32 @@ const styles = StyleSheet.create({
         fontSize: scaledSize(12),
         color: '#888',
     },
+    passwordInputContainer: {
+        backgroundColor: 'white',
+        padding: scaledSize(12),
+        borderRadius: scaledSize(8),
+        marginBottom: scaledSize(8),
+    },
+    passwordInput: {
+        height: scaledSize(40),
+        borderColor: '#ddd',
+        borderWidth: 1,
+        borderRadius: scaledSize(4),
+        paddingHorizontal: scaledSize(8),
+    },
+    inputContainer: {
+        backgroundColor: 'white',
+        padding: scaledSize(12),
+        borderRadius: scaledSize(8),
+        marginBottom: scaledSize(8),
+    },
+    input: {
+        height: scaledSize(40),
+        borderColor: '#ddd',
+        borderWidth: 1,
+        borderRadius: scaledSize(4),
+        paddingHorizontal: scaledSize(8),
+    },
     optionButton: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -284,6 +442,19 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 25,
+    }, walletInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'white',
+        padding: scaledSize(12),
+        borderRadius: scaledSize(8),
+        marginBottom: scaledSize(16),
+    },
+    walletBalanceText: {
+        fontSize: scaledSize(16),
+        marginLeft: scaledSize(8),
+        color: '#4CAF50',
+        fontWeight: 'bold',
     },
 });
 

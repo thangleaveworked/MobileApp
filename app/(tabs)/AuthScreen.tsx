@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, ScrollView, Dimensions } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 const { width, height } = Dimensions.get('window');
 
 const AuthScreen = () => {
@@ -12,54 +11,73 @@ const AuthScreen = () => {
     const [name, setName] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const navigation = useNavigation();
+    useFocusEffect(
+        React.useCallback(() => {
+          // This effect runs when the screen comes into focus
+          setEmail('');
+          setPassword('');
+        }, [])
+      );
+    const handleForgotPassword = () => {
+        navigation.navigate('ForgotPasswordScreen' as never);
+    };
+
+    const isValidEmail = (email: string) => {
+        // Biểu thức chính quy để kiểm tra định dạng email
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailRegex.test(email);
+    };
 
     const handleSubmit = async () => {
         if (!email || !password || (!isLogin && !name)) {
             Alert.alert("Lỗi", "Vui lòng điền đầy đủ thông tin");
             return;
         }
-
+        if (password.length < 8) {
+            Alert.alert("Lỗi", "Mật khẩu phải có ít nhất 8 ký tự");
+            return;
+        }
+        if (!isValidEmail(email)) {
+            Alert.alert("Lỗi", "Vui lòng nhập một địa chỉ email hợp lệ");
+            return;
+        }
+    
         setIsLoading(true);
-
-        const body = isLogin ? { "type": "signin", email, password } : { "type": "signup", email, name, password };
-
+    
+        const body = isLogin 
+            ? { "type": "signin", email, password } 
+            : { "type": "signup", email, name, password };
+        console.log(body);
         try {
-            const response = await fetch(`http://192.168.2.24:5000/api`, {
+            const response = await fetch(`http://192.168.2.23:5000/api`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify(body),
             });
-
-            const contentType = response.headers.get("content-type");
-            if (contentType && contentType.indexOf("application/json") !== -1) {
-                const data = await response.json();
-                if (response.ok) {
-                    await handleSuccessResponse(data);
-                } else {
-                    handleErrorResponse(data);
-                }
+            console.log(response);
+            const data = await response.json();
+            if (response.ok) {
+                await handleSuccessResponse(data);
             } else {
-                console.error("Unexpected response:", await response.text());
-                Alert.alert("Lỗi", "Kết nối đến máy chủ thất bại !");
+                handleErrorResponse(data);
             }
         } catch (error) {
-            console.error("Error:", error);
+            console.error("Error connecting to server:", error);
             Alert.alert("Lỗi", "Không thể kết nối đến server");
         } finally {
             setIsLoading(false);
         }
     };
-
-    const handleSuccessResponse = async (data:any) => {
+    
+    const handleSuccessResponse = async (data: any) => {
         console.log(data);
         switch (data.message) {
             case "User signed in successfully!":
             case "User logged in successfully!":
                 const savedSuccessfully = await saveUserData(data);
                 if (savedSuccessfully) {
-                    // Kiểm tra dữ liệu đã lưu
                     const savedData = await AsyncStorage.getItem('userData');
                     if (savedData) {
                         console.log("Dữ liệu đã được lưu:", JSON.parse(savedData));
@@ -73,15 +91,17 @@ const AuthScreen = () => {
                 }
                 break;
             case "User registered successfully!":
-                Alert.alert("Thành công", "Đăng ký thành công");
-                break;
-            case "Invalid username or password":
-                Alert.alert("Lỗi", "Sai tên đăng nhập hoặc mật khẩu");
+                Alert.alert("Thành công", "Đăng ký thành công", [
+                    { text: "OK", onPress: () => setIsLogin(true) }
+                ]);
                 break;
             default:
                 console.log(data);
+                Alert.alert("Thông báo", data.message || "Có lỗi xảy ra");
         }
     };
+    
+ 
 
     const saveUserData = async (data:any) => {
         try {
@@ -92,7 +112,8 @@ const AuthScreen = () => {
                 amount: data.amount,
                 categories: data.categories,
                 transactions: data.transactions,
-                note: data.note
+                note: data.note,
+                wallet: data.wallet // Add this line to include the wallet balance
             }));
             return true; // Trả về true nếu lưu thành công
         } catch (error) {
@@ -101,19 +122,15 @@ const AuthScreen = () => {
         }
     };
 
-    const handleErrorResponse = (data:any) => {
-        if (data.message === "Tài khoản đã tồn tại") {
+    const handleErrorResponse = (data: any) => {
+        if (data.message === "Email đã được sử dụng") {
             Alert.alert("Lỗi", data.message);
+        } else if (data.message === "Missing required fields") {
+            Alert.alert("Lỗi", "Vui lòng điền đầy đủ thông tin");
         } else {
             Alert.alert("Lỗi", data.message || "Có lỗi xảy ra");
         }
     };
-
-    const handleForgotPassword = () => {
-        // Implement forgot password logic here
-        Alert.alert("Quên mật khẩu", "Chức năng đang được phát triển");
-    };
-
     return (
         <KeyboardAvoidingView 
             behavior={Platform.OS === "ios" ? "padding" : "height"}

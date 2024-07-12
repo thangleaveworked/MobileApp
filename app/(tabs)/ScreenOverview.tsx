@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Image } from 'react-native';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Platform, Dimensions } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation, NavigationProp } from '@react-navigation/native'; // Updated import
@@ -8,34 +9,36 @@ import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/dat
 const { width, height } = Dimensions.get('window');
 
 type RootStackParamList = {
-  DetailTransaction: { transactionData: any };
-  ScreenAccountManagement: { userData: UserData };
-  ScreenAddTransaction: undefined;
-  NotificationScreen: { notifications: { message: string; time: string }[] };
+    DetailTransaction: { transactionData: any };
+    ScreenAccountManagement: { userData: UserData };
+    ScreenAddTransaction: undefined;
+    NotificationScreen: { notifications: { message: string; time: string }[] };
 };
 
 type ScreenOverViewProps = {
-  navigation: NavigationProp<RootStackParamList>; // Updated type usage
+    navigation: NavigationProp<RootStackParamList>; // Updated type usage
 };
 
 type UserData = {
-  notification?: string;
-  transactions: string;
-  categories: string;
+    notification?: string;
+    transactions: string;
+    categories: string;
+    amount?: number; // Assuming `amount` can be optional
+
 };
 
 type Transaction = {
-  type: 'income' | 'expense';
-  amount: number;
-  date: string;
-  category_id: string;
-  note: string;
+    type: 'income' | 'expense';
+    amount: number;
+    date: string;
+    category_id: string;
+    note: string;
 };
 
 type Category = {
-  category_id: string;
-  category_name: string;
-  category_icon: string;
+    category_id: string;
+    category_name: string;
+    category_icon: string;
 };
 
 const ScreenOverView: React.FC<ScreenOverViewProps> = ({ navigation }) => {
@@ -139,11 +142,7 @@ const ScreenOverView: React.FC<ScreenOverViewProps> = ({ navigation }) => {
     const totalIncome = filteredTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
     const totalExpense = filteredTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
     const balance = totalIncome - totalExpense;
-    const allTransactions: Transaction[] = JSON.parse(userData.transactions);
-    const totalFixedIncome = allTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
-    const totalFixedExpense = allTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
-    const fixedBalance = totalFixedIncome - totalFixedExpense;
-    
+
     const groupedTransactions = filteredTransactions.reduce((groups: { [key: string]: Transaction[] }, transaction: Transaction) => {
         const date = transaction.date;
         if (!groups[date]) {
@@ -162,9 +161,9 @@ const ScreenOverView: React.FC<ScreenOverViewProps> = ({ navigation }) => {
         <View style={styles.container}>
             <View style={styles.header}>
                 <View style={styles.headerTop}>
-
-                    <Icon name="menu" size={width * 0.08} color="#fff" />
-                    <Text style={styles.balance}>{fixedBalance.toLocaleString()} đ</Text>
+                    <Image source={require('../../assets/images/logodomdomnenxanh.png')} style={styles.logo} />
+                    <Text style={styles.balance}>
+                    {userData.amount ? ((userData as any).amount < 0 ? '-' : '') + Math.abs((userData as any).amount).toLocaleString() : '0'} đ                    </Text>
                     <TouchableOpacity onPress={handleNotificationPress} style={styles.notificationContainer}>
                         <Icon name="bell" size={width * 0.08} color="#fff" />
                         {hasNotification && <View style={styles.notificationBadge} />}
@@ -425,7 +424,16 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 25,
     },
-
+    logo: {
+        width: width * 0.15,  // Adjust size as needed
+        height: width * 0.15,  // Adjust size as needed
+        resizeMode: 'contain',
+    },
+    headerImage: {
+        width: width * 0.08,  // Adjust size as needed
+        height: width * 0.08,  // Adjust size as needed
+        resizeMode: 'contain',
+    },
 });
 
 export default ScreenOverView;

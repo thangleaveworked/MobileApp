@@ -107,7 +107,7 @@ const ScreenAddTransaction: React.FC<ScreenAddTransactionProps> = ({ navigation 
   const sendDataToServer = async (data: any): Promise<any> => {
     try {
       console.log('Sending data to server:', data);
-      const response = await fetch('http://192.168.2.24:5000/api', {
+      const response = await fetch('http://192.168.2.23:5000/api', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

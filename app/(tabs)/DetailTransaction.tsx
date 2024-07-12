@@ -36,7 +36,7 @@ const DetailTransaction = () => {
       }
   
       // Gửi yêu cầu POST đến server
-      const response = await fetch('http://192.168.2.24:5000/api', {
+      const response = await fetch('http://192.168.2.23:5000/api', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -84,7 +84,7 @@ export default function CameraScreen() {
   const sendUrlToApi = async (url: any) => {
     setStatus('processing');
     try {
-      const response = await fetch('http://192.168.2.24:5000/api', {
+      const response = await fetch('http://192.168.2.23:5000/api', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
