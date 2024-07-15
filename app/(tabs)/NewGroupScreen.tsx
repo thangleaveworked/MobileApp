@@ -5,8 +5,6 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const STORAGE_KEY = '@categories_screen';
-
 type RootStackParamList = {
   NewGroupScreen: { selectedIcon?: string; isExpense?: boolean };
   IconSelectionScreen: { currentIcon: string };
@@ -31,7 +29,7 @@ const NewGroupScreen: React.FC = () => {
     if (route.params?.isExpense !== undefined) {
       setIsExpense(route.params.isExpense);
     }
-    
+
     fetchUserData();
   }, [route.params]);
 
@@ -56,9 +54,9 @@ const NewGroupScreen: React.FC = () => {
       Alert.alert('Lỗi', 'Vui lòng chọn biểu tượng, nhập tên nhóm và đảm bảo đã đăng nhập');
       return;
     }
-
+  
     setIsSaving(true);
-
+  
     try {
       const response = await fetch('http://192.168.2.23:5000/api', {
         method: 'POST',
@@ -68,38 +66,63 @@ const NewGroupScreen: React.FC = () => {
         body: JSON.stringify({
           type: "insert_categories",
           user_id: userId.toString(),
-          category_name: selectedIcon, 
-          category_icon: groupName.trim(), 
+          category_name: groupName.trim(),
+          category_icon: selectedIcon,
           category_type: isExpense ? 'expense' : 'income'
         }),
       });
-      
+  
       if (!response.ok) {
         throw new Error('Network response was not ok');
       }
-
-      const result = await response.json();
-
-      await saveCategories(result);
-      const newCategory = result[result.length - 1];
-      navigation.navigate('ExpenseCategoriesScreen' as never, { newCategory } as never);
+  
+      const responseData = await response.json();
+      console.log('Response data:', JSON.stringify(responseData));
+  
+      const savedSuccessfully = await saveUserData(responseData);
+  
+      if (savedSuccessfully) {
+        const userDataJson = await AsyncStorage.getItem('userData');
+        console.log("Saved userData:", userDataJson);
+        if (userDataJson) {
+          navigation.navigate('ExpenseCategoriesScreen' as never, { newCategory: JSON.parse(userDataJson) } as never);
+        } else {
+          throw new Error('Failed to retrieve saved data');
+        }
+      } else {
+        throw new Error('Failed to save user data');
+      }
     } catch (error) {
-      console.error('Error saving new group:', error);
-      Alert.alert('Lỗi', 'Không thể lưu nhóm mới. Vui lòng thử lại sau.');
+      console.error('Error in handleSave:', error);
+      Alert.alert('Lỗi', `Không thể lưu nhóm mới: ${error.message}`);
     } finally {
       setIsSaving(false);
     }
   };
 
-  const saveCategories = async (categories: any) => {
+  const saveUserData = async (data: any) => {
     try {
-      const categoriesToSave = Array.isArray(categories) ? categories : [categories];
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(categoriesToSave));
-      console.log('Categories saved to AsyncStorage:', categoriesToSave);
+      const cleanData = {
+        user_id: data.user_id,
+        user_name: data.user_name,
+        user_email: data.user_email,
+        amount: data.amount,
+        categories: data.categories,
+        transactions: data.transactions,
+        wallet: data.wallet
+      };
+      
+      const jsonString = JSON.stringify(cleanData);
+      console.log('Attempting to save data:', jsonString);
+      await AsyncStorage.setItem('userData', jsonString);
+      console.log('Data saved successfully');
+      return true;
     } catch (error) {
-      console.error('Error saving categories to AsyncStorage:', error);
+      console.error("Error saving user data:", error);
+      return false;
     }
   };
+
 
   const isSaveDisabled = !selectedIcon || !groupName.trim();
 

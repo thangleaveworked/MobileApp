@@ -47,7 +47,7 @@ const AuthScreen = () => {
         const body = isLogin 
             ? { "type": "signin", email, password } 
             : { "type": "signup", email, name, password };
-        console.log(body);
+        // console.log(body);
         try {
             const response = await fetch(`http://192.168.2.23:5000/api`, {
                 method: 'POST',
@@ -56,7 +56,7 @@ const AuthScreen = () => {
                 },
                 body: JSON.stringify(body),
             });
-            console.log(response);
+            // console.log(response);
             const data = await response.json();
             if (response.ok) {
                 await handleSuccessResponse(data);
@@ -72,7 +72,7 @@ const AuthScreen = () => {
     };
     
     const handleSuccessResponse = async (data: any) => {
-        console.log(data);
+        // console.log(data);
         switch (data.message) {
             case "User signed in successfully!":
             case "User logged in successfully!":
@@ -80,7 +80,7 @@ const AuthScreen = () => {
                 if (savedSuccessfully) {
                     const savedData = await AsyncStorage.getItem('userData');
                     if (savedData) {
-                        console.log("Dữ liệu đã được lưu:", JSON.parse(savedData));
+                        // console.log("Dữ liệu đã được lưu:", JSON.parse(savedData));
                         navigation.navigate('ScreenOverView' as never);
                     } else {
                         console.log("Không tìm thấy dữ liệu đã lưu");
@@ -96,7 +96,7 @@ const AuthScreen = () => {
                 ]);
                 break;
             default:
-                console.log(data);
+                // console.log(data);
                 Alert.alert("Thông báo", data.message || "Có lỗi xảy ra");
         }
     };

@@ -35,7 +35,7 @@ const IconSelectionScreen: React.FC = () => {
       <View style={styles.iconCircle}>
         <Icon name={item.name} size={24} color="#FFF" />
       </View>
-      <Text style={styles.iconLabel}>{item.label}</Text>
+      {/* <Text style={styles.iconLabel}>{item.label}</Text> */}
     </TouchableOpacity>
   );
 

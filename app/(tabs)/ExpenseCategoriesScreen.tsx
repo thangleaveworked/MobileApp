@@ -2,17 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
 type RootStackParamList = {
   ExpenseCategoriesScreen: { newCategory?: any };
   NewGroupScreen: { isExpense: boolean };
-  ScreenAddTransaction: { 
-    category: { 
-      name: string; 
-      icon: string; 
-      id: string 
+  ScreenAddTransaction: {
+    category: {
+      name: string;
+      icon: string;
+      id: string
     };
     isExpense: boolean;
   };
@@ -34,28 +33,34 @@ const ExpenseCategoriesScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute<ExpenseCategoriesScreenRouteProp>();
 
-  useEffect(() => {
-    loadCategories();
-  }, []);
-
-  useEffect(() => {
-    if (route.params?.newCategory) {
+  useFocusEffect(
+    React.useCallback(() => {
       loadCategories();
-      navigation.setParams({ newCategory: undefined });
-    }
-  }, [route.params]);
-
+    }, [])
+  );
   const loadCategories = async () => {
     try {
       const userDataJson = await AsyncStorage.getItem('userData');
       if (userDataJson != null) {
         const userData = JSON.parse(userDataJson);
-        const categoriesJson = userData.categories;
-        const allCategories: Category[] = JSON.parse(categoriesJson);
-  
+        // console.log("=============================================");
+        // console.log('UserData:', userData);
+        
+        let allCategories: Category[];
+        if (typeof userData.categories === 'string') {
+          allCategories = JSON.parse(userData.categories);
+        } else if (Array.isArray(userData.categories)) {
+          allCategories = userData.categories;
+        } else {
+          console.error('Unexpected categories format:', userData.categories);
+          return;
+        }
         if (Array.isArray(allCategories)) {
+          // console.log('Loaded categories:', allCategories);
           const spend = allCategories.filter(cat => cat.category_type === 'expense');
           const collect = allCategories.filter(cat => cat.category_type === 'income');
+          // console.log('Spend categories:', spend);
+          // console.log('Collect categories:', collect);
           setSpendCategories(spend);
           setCollectCategories(collect);
         } else {
@@ -116,8 +121,8 @@ const ExpenseCategoriesScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity 
-          style={styles.newGroupButton} 
+        <TouchableOpacity
+          style={styles.newGroupButton}
           onPress={() => {
             navigation.navigate('NewGroupScreen', {
               isExpense: activeTab === 'spend'
