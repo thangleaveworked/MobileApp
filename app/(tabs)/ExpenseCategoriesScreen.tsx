@@ -83,7 +83,12 @@ const ExpenseCategoriesScreen: React.FC = () => {
       </TouchableOpacity>
     ));
   };
-
+  const handleNewGroup = () => {
+    navigation.navigate('NewGroupScreen', {
+      isExpense: activeTab === 'spend',
+      currentCategories: activeTab === 'spend' ? spendCategories : collectCategories
+    });
+  };
   const handleCategorySelect = (category: Category) => {
     navigation.navigate('ScreenAddTransaction', {
       category: {
@@ -123,11 +128,7 @@ const ExpenseCategoriesScreen: React.FC = () => {
 
         <TouchableOpacity
           style={styles.newGroupButton}
-          onPress={() => {
-            navigation.navigate('NewGroupScreen', {
-              isExpense: activeTab === 'spend'
-            });
-          }}
+          onPress={handleNewGroup}
         >
           <Icon name="plus-circle-outline" size={24} color={activeTab === 'spend' ? '#4CAF50' : '#4CAF50'} />
           <Text style={[styles.newGroupText, { color: activeTab === 'spend' ? '#4CAF50' : '#4CAF50' }]}>NHÓM MỚI</Text>

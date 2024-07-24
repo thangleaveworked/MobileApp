@@ -6,12 +6,24 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type RootStackParamList = {
-  NewGroupScreen: { selectedIcon?: string; isExpense?: boolean };
+  NewGroupScreen: { 
+    selectedIcon?: string; 
+    isExpense?: boolean;
+    currentCategories: Category[];
+  };
   IconSelectionScreen: { currentIcon: string };
   ExpenseCategoriesScreen: { newCategory: any };
 };
 
 type NewGroupScreenRouteProp = RouteProp<RootStackParamList, 'NewGroupScreen'>;
+
+
+type Category = {
+  category_id: string;
+  category_name: string;
+  category_icon: string;
+  category_type: 'expense' | 'income';
+};
 
 const NewGroupScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -21,6 +33,8 @@ const NewGroupScreen: React.FC = () => {
   const [isExpense, setIsExpense] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [currentCategories, setCurrentCategories] = useState<Category[]>([]);
 
   useEffect(() => {
     if (route.params?.selectedIcon) {
@@ -28,6 +42,9 @@ const NewGroupScreen: React.FC = () => {
     }
     if (route.params?.isExpense !== undefined) {
       setIsExpense(route.params.isExpense);
+    }
+    if (route.params?.currentCategories) {
+      setCurrentCategories(route.params.currentCategories);
     }
 
     fetchUserData();
@@ -44,7 +61,20 @@ const NewGroupScreen: React.FC = () => {
       console.error('Error fetching user data:', error);
     }
   };
-
+  const validateGroupName = (name: string) => {
+    const isDuplicate = currentCategories.some(
+      category => category.category_name.toLowerCase() === name.toLowerCase()
+    );
+    if (isDuplicate) {
+      setErrorMessage('Trùng tên danh mục');
+    } else {
+      setErrorMessage('');
+    }
+  };
+  const handleGroupNameChange = (text: string) => {
+    setGroupName(text);
+    validateGroupName(text);
+  };
   const handleIconPress = () => {
     navigation.navigate('IconSelectionScreen' as never, { currentIcon: selectedIcon } as never);
   };
@@ -54,7 +84,10 @@ const NewGroupScreen: React.FC = () => {
       Alert.alert('Lỗi', 'Vui lòng chọn biểu tượng, nhập tên nhóm và đảm bảo đã đăng nhập');
       return;
     }
-  
+    if (errorMessage) {
+      Alert.alert('Lỗi', errorMessage);
+      return;
+    }
     setIsSaving(true);
   
     try {
@@ -124,7 +157,7 @@ const NewGroupScreen: React.FC = () => {
   };
 
 
-  const isSaveDisabled = !selectedIcon || !groupName.trim();
+  const isSaveDisabled = !selectedIcon || !groupName.trim() || !!errorMessage;
 
   return (
     <>
@@ -152,9 +185,10 @@ const NewGroupScreen: React.FC = () => {
               placeholder="Tên nhóm"
               placeholderTextColor="#757575"
               value={groupName}
-              onChangeText={setGroupName}
+              onChangeText={handleGroupNameChange}
             />
           </View>
+          {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
 
           <View style={styles.inputContainer}>
             <View style={styles.iconContainer}>
@@ -248,6 +282,13 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  errorText: {
+    color: 'red',
+    fontSize: 14,
+    marginTop: -12,
+    marginBottom: 8,
+    marginLeft: 66, // Để căn chỉnh với ô input
   },
 });
 

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { firebase } from '../../firebaseConfig';
 import { useNavigation } from '@react-navigation/native';
 
@@ -21,19 +22,35 @@ const UploadMediaFile = () => {
     }
 
     let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.All,
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       quality: 1,
     });
 
     if (result && !result.canceled) {
-      await uploadImage(result.assets[0].uri);
+      const compressedImage = await compressImage(result.assets[0].uri);
+      await uploadImage(compressedImage);
     } else {
       navigation.goBack(); // Quay lại nếu người dùng hủy chọn ảnh
     }
   };
 
-  const uploadImage = async (uri:any) => {
+  const compressImage = async (uri: string) => {
+    try {
+      const manipulatedImage = await ImageManipulator.manipulateAsync(
+        uri,
+        [{ resize: { width: 1080 } }], // Resize to width 1080, height will adjust automatically
+        { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
+      );
+      console.log('Compressed image size:', manipulatedImage.width, 'x', manipulatedImage.height);
+      return manipulatedImage.uri;
+    } catch (error) {
+      console.error('Error compressing image:', error);
+      return uri; // Return original URI if compression fails
+    }
+  };
+
+  const uploadImage = async (uri: string) => {
     setStatus('uploading');
     try {
       if (!uri) {
@@ -57,38 +74,8 @@ const UploadMediaFile = () => {
       navigation.goBack();
     }
   };
-  // const sendUrlToApi = async (url) => {
-  //   setStatus('processing');
-  //   try {
-  //     // Tạo đối tượng JSON cố định
-  //     const data = {
-  //       "date": "01/01/2021",
-  //       "description": "Tên cửa hàng: TOCOTOCO\nThời gian: 01/01/2021\nSản phẩm thu:\n    Tên sản phẩm: Trà sữa Panda (M)\n    Số lượng sản phẩm: 6\n    Đơn giá: 48000\n    Giảm giá: 0\n    Tên sản phẩm: Thêm Machiato Cream cheese\n    Số lượng sản phẩm: 6\n    Đơn giá: 9000\n    Giảm giá: 0\n    Tên sản phẩm: 309 đá\n    Số lượng sản phẩm: 6\n    Đơn giá: 0\n    Giảm giá: 0\nTiền thuế GTGT: 0",
-  //       "ghichu": "Hóa đơn mua đồ uống",
-  //       "message": "Processed the image and extracted text successfully!",
-  //       "total_amount": "1980002"
-  //   };
-      
-  //     console.log('Extracted data:', data);
-  //     navigation.navigate('ScreenAddTransaction', { 
-  //       invoiceData: {
-  //         total_amount: data.total_amount,
-  //         date: data.date,
-  //         description: data.description,
-  //         ghichu: data.ghichu
-  //       } 
-  //     });  
-  //     setTimeout(() => {
-  //       Alert.alert('Thành công', 'Ảnh đã được xử lý thành công!');
-  //     }, 500);
 
-  //   } catch (error) {
-  //     console.error('Error processing image:', error);
-  //     Alert.alert('Error', 'Xử lý ảnh thất bại. Vui lòng thử lại.');
-  //     navigation.goBack();
-  //   }
-  // };
-  const sendUrlToApi = async (url: any) => {
+  const sendUrlToApi = async (url: string) => {
     setStatus('processing');
     try {
       const response = await fetch('http://192.168.2.23:5000/api', {
@@ -106,7 +93,6 @@ const UploadMediaFile = () => {
       const data = await response.json();
       console.log('Raw API response:', JSON.stringify(data));
   
-      // Kiểm tra xem data có chứa thông tin cần thiết không
       if (data && data.description) {
         console.log('Extracted data:', data);
         navigation.navigate('ScreenAddTransaction', { 
@@ -125,7 +111,7 @@ const UploadMediaFile = () => {
       }
   
     } catch (error) {
-      Alert.alert('Error', 'Ảnh không hợp lệ hoặc không có thông tin cần thiết');
+      Alert.alert('Error', 'Ảnh không hợp lệ hoặc không có thông tin cần thiết');
       navigation.goBack();
     }
   };

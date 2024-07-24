@@ -1,31 +1,35 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, Alert, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, Alert, TextInput, ScrollView } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RouteProp } from '@react-navigation/native';
+import * as LocalAuthentication from 'expo-local-authentication';
+import { firebase } from '../../firebaseConfig';
+import * as ImageManipulator from 'expo-image-manipulator';
 
 const { width, height } = Dimensions.get('window');
 
 type RootStackParamList = {
-  AuthScreen: undefined;
-  ScreenOverView: undefined;
-  ScreenAddTransaction: undefined;
-  ScreenAccountManagement: { userData: UserData; onLogout: () => void };
+    AuthScreen: undefined;
+    ScreenOverView: undefined;
+    ScreenAddTransaction: undefined;
+    ScreenAccountManagement: { userData: UserData; onLogout: () => void };
 };
 
 type UserData = {
-  user_id: string;
-  user_name: string;
-  user_email: string;
-  amount: number;  // Tổng tiền của ví
-  wallet: number;  // Số dư hiện tại
+    user_id: string;
+    user_name: string;
+    user_email: string;
+    amount: number;  // Tổng tiền của ví
+    wallet: number;  // Số dư hiện tại
+    password: string;
 };
 
 type ScreenAccountManagementProps = {
-  route: RouteProp<RootStackParamList, 'ScreenAccountManagement'>;
-  navigation: StackNavigationProp<RootStackParamList, 'ScreenAccountManagement'>;
+    route: RouteProp<RootStackParamList, 'ScreenAccountManagement'>;
+    navigation: StackNavigationProp<RootStackParamList, 'ScreenAccountManagement'>;
 };
 
 const ScreenAccountManagement: React.FC<ScreenAccountManagementProps> = ({ route, navigation }) => {
@@ -35,10 +39,44 @@ const ScreenAccountManagement: React.FC<ScreenAccountManagementProps> = ({ route
     const [showPasswordInput, setShowPasswordInput] = useState(false);
     const [walletBalance, setWalletBalance] = useState('');
     const [showWalletInput, setShowWalletInput] = useState(false);
+    const [passwordError, setPasswordError] = useState('');
+    const [isBiometricSupported, setIsBiometricSupported] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
 
     useEffect(() => {
         loadProfileImage();
+        checkBiometricSupport();
     }, []);
+
+    const checkBiometricSupport = async () => {
+        const compatible = await LocalAuthentication.hasHardwareAsync();
+        setIsBiometricSupported(compatible);
+    };
+    const togglePasswordVisibility = () => {
+        setShowPassword(!showPassword);
+    };
+    const handleBiometricAuth = async () => {
+        try {
+            const biometricAuth = await LocalAuthentication.authenticateAsync({
+                promptMessage: 'Xác thực vân tay',
+            });
+
+            if (biometricAuth.success) {
+                await AsyncStorage.setItem('sign_in', JSON.stringify({
+                    email: userData.user_email,
+                    password: userData.password
+                }));
+                Alert.alert('Xác thực thành công', 'Thông tin đăng nhập đã được lưu.');
+                const signInData = await AsyncStorage.getItem('sign_in');
+                console.log(signInData);
+            } else {
+                Alert.alert('Xác thực thất bại', 'Vui lòng thử lại.');
+            }
+        } catch (error) {
+            console.error('Lỗi xác thực vân tay:', error);
+            Alert.alert('Lỗi', 'Không thể xác thực vân tay. Vui lòng thử lại sau.');
+        }
+    };
 
     const formatNumber = (num: string): string => {
         num = num.replace(/[^\d.]/g, '');
@@ -52,18 +90,27 @@ const ScreenAccountManagement: React.FC<ScreenAccountManagementProps> = ({ route
 
     const loadProfileImage = async (): Promise<void> => {
         try {
-            const savedImage = await AsyncStorage.getItem(`profileImage_${userData.user_id}`);
-            if (savedImage) {
-                setProfileImage(savedImage);
-            }
+            const imageRef = firebase.storage().ref().child(`profileImages/${userData.user_id}`);
+            const url = await imageRef.getDownloadURL();
+            console.log('Firebase Storage URL:', url); // Log URL
+            setProfileImage(url);
         } catch (error) {
             console.log('Error loading profile image:', error);
+            setProfileImage(null);
         }
+    };
+    const compressImage = async (uri: string) => {
+        const result = await ImageManipulator.manipulateAsync(
+            uri,
+            [{ resize: { width: 500 } }], // Resize to width of 500, height will adjust automatically
+            { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG } // Compress to 70% quality
+        );
+        return result.uri;
     };
 
     const handleChangeProfilePicture = async (): Promise<void> => {
         const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        
+
         if (permissionResult.granted === false) {
             Alert.alert("Permission required", "Permission to access camera roll is required!");
             return;
@@ -76,13 +123,26 @@ const ScreenAccountManagement: React.FC<ScreenAccountManagementProps> = ({ route
             quality: 1,
         });
 
-        if (!result.canceled) {
-            const newImageUri = result.assets[0].uri;
-            setProfileImage(newImageUri);
+        if (!result.canceled && result.assets[0].uri) {
             try {
-                await AsyncStorage.setItem(`profileImage_${userData.user_id}`, newImageUri);
+                const compressedUri = await compressImage(result.assets[0].uri);
+                const response = await fetch(compressedUri);
+                const blob = await response.blob();
+
+                const storageRef = firebase.storage().ref().child(`profileImages/${userData.user_id}`);
+                const snapshot = await storageRef.put(blob);
+
+                const downloadURL = await snapshot.ref.getDownloadURL();
+                setProfileImage(downloadURL);
+
+                // Update the profile image URL in your database here
+                // For example:
+                // await updateProfileImageInDatabase(userData.user_id, downloadURL);
+
+                Alert.alert('Success', 'Profile picture has been updated!');
             } catch (error) {
-                console.log('Error saving profile image:', error);
+                console.error('Error uploading image:', error);
+                Alert.alert('Error', 'Failed to upload image. Please try again later.');
             }
         }
     };
@@ -91,10 +151,19 @@ const ScreenAccountManagement: React.FC<ScreenAccountManagementProps> = ({ route
         console.log('Account info pressed');
     };
 
+    const validatePassword = (password: string): string => {
+        const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*])(?=.{8,})/;
+        if (!regex.test(password)) {
+            return 'Mật khẩu phải có ít nhất 8 ký tự, bao gồm chữ hoa, chữ thường và ký tự đặc biệt';
+        }
+        return '';
+    };
+
     const handleChangePassword = async (): Promise<void> => {
         if (showPasswordInput) {
-            if (newPassword.length < 8) {
-                Alert.alert("Lỗi", "Mật khẩu phải có ít nhất 8 ký tự");
+            const error = validatePassword(newPassword);
+            if (error) {
+                setPasswordError(error);
                 return;
             }
 
@@ -114,7 +183,12 @@ const ScreenAccountManagement: React.FC<ScreenAccountManagementProps> = ({ route
                     Alert.alert(
                         "Thành công",
                         "Mật khẩu đã được cập nhật thành công.",
-                        [{ text: "OK", onPress: () => setShowPasswordInput(false) }]
+                        [{
+                            text: "OK", onPress: () => {
+                                setShowPasswordInput(false);
+                                setPasswordError('');
+                            }
+                        }]
                     );
                     setNewPassword('');
                 } else {
@@ -126,6 +200,7 @@ const ScreenAccountManagement: React.FC<ScreenAccountManagementProps> = ({ route
             }
         } else {
             setShowPasswordInput(true);
+            setPasswordError('');
         }
     };
 
@@ -179,7 +254,6 @@ const ScreenAccountManagement: React.FC<ScreenAccountManagementProps> = ({ route
         }
     };
 
-
     const handleLogout = async (): Promise<void> => {
         try {
             await AsyncStorage.removeItem('userToken');
@@ -199,78 +273,104 @@ const ScreenAccountManagement: React.FC<ScreenAccountManagementProps> = ({ route
 
     return (
         <View style={styles.container}>
-            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-                <Icon name="arrow-left" size={scaledSize(20)} color="#000" />
-                <Text style={styles.title}>Quản lý tài khoản</Text>
-            </TouchableOpacity>
+            <ScrollView contentContainerStyle={styles.scrollViewContent}>
+                <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+                    <Icon name="arrow-left" size={scaledSize(20)} color="#000" />
+                    <Text style={styles.title}>Quản lý tài khoản</Text>
+                </TouchableOpacity>
 
-            <TouchableOpacity style={styles.accountInfo} onPress={handleAccountInfoPress}>
-                <View style={styles.avatarContainer}>
-                    {profileImage ? (
-                        <Image source={{ uri: profileImage }} style={styles.avatar} />
-                    ) : (
-                        <View style={styles.avatar}>
-                            <Text style={styles.avatarText}>{userData.user_name ? userData.user_name[0].toUpperCase() : 'U'}</Text>
+                <TouchableOpacity style={styles.accountInfo} onPress={handleAccountInfoPress}>
+                    <View style={styles.avatarContainer}>
+                        {profileImage ? (
+                            <Image source={{ uri: profileImage }} style={styles.avatar} />
+                        ) : (
+                            <View style={styles.avatar}>
+                                <Text style={styles.avatarText}>{userData.user_name ? userData.user_name[0].toUpperCase() : 'U'}</Text>
+                            </View>
+                        )}
+                        <TouchableOpacity style={styles.cameraIcon} onPress={handleChangeProfilePicture}>
+                            <Icon name="camera" size={scaledSize(18)} color="#fff" />
+                        </TouchableOpacity>
+                    </View>
+                    <View style={styles.accountDetails}>
+                        <Text style={styles.accountName}>{userData.user_name}</Text>
+                        <Text style={styles.accountEmail}>{userData.user_email}</Text>
+                    </View>
+                </TouchableOpacity>
+
+                <View style={styles.walletInfo}>
+                    <Icon name="wallet" size={scaledSize(24)} color="#4CAF50" />
+                    <Text style={styles.walletBalanceText}>
+                        Số dư ví hiện tại: {userData.wallet !== undefined ? formatNumber(userData.wallet.toString()) : '0'} VNĐ
+                    </Text>
+                </View>
+
+                {showPasswordInput && (
+                    <View style={styles.inputContainer}>
+                        <View style={styles.passwordInputContainer}>
+                            <TextInput
+                                style={styles.passwordInput}
+                                placeholder="Nhập mật khẩu mới"
+                                secureTextEntry={!showPassword}
+                                value={newPassword}
+                                onChangeText={(text) => {
+                                    setNewPassword(text);
+                                    setPasswordError(validatePassword(text));
+                                }}
+                            />
+                            <TouchableOpacity 
+                                style={styles.eyeIcon} 
+                                onPress={togglePasswordVisibility}
+                            >
+                                <Icon 
+                                    name={showPassword ? "eye-off" : "eye"} 
+                                    size={24} 
+                                    color="#aaa"
+                                />
+                            </TouchableOpacity>
                         </View>
-                    )}
-                    <TouchableOpacity style={styles.cameraIcon} onPress={handleChangeProfilePicture}>
-                        <Icon name="camera" size={scaledSize(18)} color="#fff" />
+                        {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
+                    </View>
+                )}
+
+                <TouchableOpacity style={styles.optionButton} onPress={handleChangePassword}>
+                    <Icon name="lock-reset" size={scaledSize(20)} color="#000" />
+                    <Text style={styles.optionText}>
+                        {showPasswordInput ? "Xác nhận đổi mật khẩu" : "Thay đổi mật khẩu"}
+                    </Text>
+                </TouchableOpacity>
+
+                {isBiometricSupported && (
+                    <TouchableOpacity style={styles.optionButton} onPress={handleBiometricAuth}>
+                        <Icon name="fingerprint" size={scaledSize(20)} color="#000" />
+                        <Text style={styles.optionText}>Xác thực vân tay</Text>
                     </TouchableOpacity>
-                </View>
-                <View style={styles.accountDetails}>
-                    <Text style={styles.accountName}>{userData.user_name}</Text>
-                    <Text style={styles.accountEmail}>{userData.user_email}</Text>
-                </View>
-            </TouchableOpacity>
+                )}
 
-            <View style={styles.walletInfo}>
-                <Icon name="wallet" size={scaledSize(24)} color="#4CAF50" />
-                <Text style={styles.walletBalanceText}>
-                    Số dư ví hiện tại: {userData.wallet !== undefined ? formatNumber(userData.wallet.toString()) : '0'} VNĐ
-                </Text>
-            </View>
+                {showWalletInput && (
+                    <View style={styles.inputContainer}>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Nhập số dư ví tiền mặt"
+                            keyboardType="numeric"
+                            value={walletBalance}
+                            onChangeText={(text) => setWalletBalance(formatNumber(text))}
+                        />
+                    </View>
+                )}
 
-            {showPasswordInput && (
-                <View style={styles.inputContainer}>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Nhập mật khẩu mới"
-                        secureTextEntry
-                        value={newPassword}
-                        onChangeText={setNewPassword}
-                    />
-                </View>
-            )}
+                <TouchableOpacity style={styles.optionButton} onPress={handleUpdateWallet}>
+                    <Icon name="wallet" size={scaledSize(20)} color="#000" />
+                    <Text style={styles.optionText}>
+                        {showWalletInput ? "Xác nhận cập nhật ví" : "Cập nhật ví tiền mặt"}
+                    </Text>
+                </TouchableOpacity>
 
-            <TouchableOpacity style={styles.optionButton} onPress={handleChangePassword}>
-                <Icon name="lock-reset" size={scaledSize(20)} color="#000" />
-                <Text style={styles.optionText}>
-                    {showPasswordInput ? "Xác nhận đổi mật khẩu" : "Thay đổi mật khẩu"}
-                </Text>
-            </TouchableOpacity>
+                <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+                    <Text style={styles.logoutButtonText}>Đăng xuất</Text>
+                </TouchableOpacity>
+            </ScrollView>
 
-            {showWalletInput && (
-                <View style={styles.inputContainer}>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Nhập số dư ví tiền mặt"
-                        keyboardType="numeric"
-                        value={walletBalance}
-                        onChangeText={(text) => setWalletBalance(formatNumber(text))}
-                    />
-                </View>
-            )}
-
-            <TouchableOpacity style={styles.optionButton} onPress={handleUpdateWallet}>
-                <Icon name="wallet" size={scaledSize(20)} color="#000" />
-                <Text style={styles.optionText}>
-                    {showWalletInput ? "Xác nhận cập nhật ví" : "Cập nhật ví tiền mặt"}
-                </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-                <Text style={styles.logoutButtonText}>Đăng xuất</Text>
-            </TouchableOpacity>
             <View style={styles.tabBar}>
                 <TouchableOpacity style={styles.tabItem} onPress={handleOverviewPress}>
                     <Icon name="home" size={24} color="#757575" />
@@ -290,7 +390,6 @@ const ScreenAccountManagement: React.FC<ScreenAccountManagementProps> = ({ route
     );
 };
 
-
 const scaledSize = (size: number) => {
     const scale = Math.min(width, height) / 375;
     return Math.round(size * scale);
@@ -300,7 +399,10 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#F5F5F5',
+    },
+    scrollViewContent: {
         padding: scaledSize(16),
+        paddingBottom: scaledSize(80), // Add extra padding at the bottom to account for the tab bar
     },
     backButton: {
         flexDirection: 'row',
@@ -358,19 +460,6 @@ const styles = StyleSheet.create({
     accountEmail: {
         fontSize: scaledSize(12),
         color: '#888',
-    },
-    passwordInputContainer: {
-        backgroundColor: 'white',
-        padding: scaledSize(12),
-        borderRadius: scaledSize(8),
-        marginBottom: scaledSize(8),
-    },
-    passwordInput: {
-        height: scaledSize(40),
-        borderColor: '#ddd',
-        borderWidth: 1,
-        borderRadius: scaledSize(4),
-        paddingHorizontal: scaledSize(8),
     },
     inputContainer: {
         backgroundColor: 'white',
@@ -442,7 +531,8 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 25,
-    }, walletInfo: {
+    },
+    walletInfo: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: 'white',
@@ -455,6 +545,25 @@ const styles = StyleSheet.create({
         marginLeft: scaledSize(8),
         color: '#4CAF50',
         fontWeight: 'bold',
+    },
+    errorText: {
+        color: 'red',
+        fontSize: scaledSize(12),
+        marginTop: scaledSize(4),
+    },passwordInputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderColor: '#ddd',
+        borderWidth: 1,
+        borderRadius: scaledSize(4),
+    },
+    passwordInput: {
+        flex: 1,
+        height: scaledSize(40),
+        paddingHorizontal: scaledSize(8),
+    },
+    eyeIcon: {
+        padding: scaledSize(10),
     },
 });
 

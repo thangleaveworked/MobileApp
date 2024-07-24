@@ -4,7 +4,7 @@ import { Camera } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { firebase } from '../../firebaseConfig';
 import { StackNavigationProp } from '@react-navigation/stack';
-
+import * as ImageManipulator from 'expo-image-manipulator';
 import { useNavigation } from '@react-navigation/native';
 type RootStackParamList = {
   ScreenAddTransaction: { invoiceData: { total_amount: any; date: any; description: any; ghichu: any; }; };
@@ -56,15 +56,26 @@ export default function CameraScreen() {
       navigation1.goBack();
     }
   };
+  const compressImage = async (uri: string) => {
+    const result = await ImageManipulator.manipulateAsync(
+      uri,
+      [{ resize: { width: 1000 } }], // Resize to width of 1000, height will adjust automatically
+      { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG } // Compress to 70% quality
+    );
+    return result.uri;
+  };
 
-  const uploadImage = async (uri: any) => {
+  const uploadImage = async (uri: string) => {
     setStatus('uploading');
     try {
       if (!uri) {
         throw new Error('Không có ảnh được chụp.');
       }
 
-      const response = await fetch(uri);
+      // Compress the image before uploading
+      const compressedUri = await compressImage(uri);
+
+      const response = await fetch(compressedUri);
       const blob = await response.blob();
 
       const storageRef = firebase.storage().ref().child(`images/${Date.now()}_${Math.floor(Math.random() * 1000)}`);
@@ -80,6 +91,29 @@ export default function CameraScreen() {
       navigation1.goBack();
     }
   };
+  // const uploadImage = async (uri: any) => {
+  //   setStatus('uploading');
+  //   try {
+  //     if (!uri) {
+  //       throw new Error('Không có ảnh được chụp.');
+  //     }
+
+  //     const response = await fetch(uri);
+  //     const blob = await response.blob();
+
+  //     const storageRef = firebase.storage().ref().child(`images/${Date.now()}_${Math.floor(Math.random() * 1000)}`);
+  //     const snapshot = await storageRef.put(blob);
+
+  //     const downloadURL = await snapshot.ref.getDownloadURL();
+
+  //     console.log('Image URL:', downloadURL);
+  //     await sendUrlToApi(downloadURL);
+  //   } catch (error) {
+  //     console.error('Lỗi khi tải ảnh lên:', error);
+  //     Alert.alert('Thất bại', 'Tải ảnh lên thất bại. Vui lòng thử lại.');
+  //     navigation1.goBack();
+  //   }
+  // };
 
   const sendUrlToApi = async (url: any) => {
     setStatus('processing');
@@ -157,3 +191,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 });
+

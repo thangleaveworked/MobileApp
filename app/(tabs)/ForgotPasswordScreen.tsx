@@ -10,7 +10,25 @@ const ForgotPasswordScreen = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [otpSent, setOtpSent] = useState(false);
     const [otpVerified, setOtpVerified] = useState(false);
+    const [passwordError, setPasswordError] = useState('');
+    const [isUpdateButtonDisabled, setIsUpdateButtonDisabled] = useState(true);
     const navigation = useNavigation();
+
+    const validatePassword = (password:any) => {
+        const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*])(?=.{8,})/;
+        if (!regex.test(password)) {
+            setPasswordError('Mật khẩu phải có ít nhất 8 ký tự, bao gồm chữ hoa, chữ thường và ký tự đặc biệt');
+            return false;
+        }
+        setPasswordError('');
+        return true;
+    };
+
+    const handleNewPasswordChange = (text:any) => {
+        setNewPassword(text);
+        const isValid = validatePassword(text);
+        setIsUpdateButtonDisabled(!isValid);
+    };
 
     const handleSendOTP = async () => {
         if (!email) {
@@ -54,8 +72,7 @@ const ForgotPasswordScreen = () => {
     };
 
     const handleUpdatePassword = async () => {
-        if (newPassword.length < 8) {
-            Alert.alert("Lỗi", "Mật khẩu phải có ít nhất 8 ký tự");
+        if (!validatePassword(newPassword)) {
             return;
         }
         
@@ -119,9 +136,10 @@ const ForgotPasswordScreen = () => {
                         style={styles.input}
                         placeholder="Mật khẩu mới"
                         value={newPassword}
-                        onChangeText={setNewPassword}
+                        onChangeText={handleNewPasswordChange}
                         secureTextEntry
                     />
+                    {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
                     <TextInput
                         style={styles.input}
                         placeholder="Xác nhận mật khẩu mới"
@@ -135,8 +153,9 @@ const ForgotPasswordScreen = () => {
                 <ActivityIndicator size="large" color="#4CAF50" />
             ) : (
                 <TouchableOpacity 
-                    style={styles.button} 
+                    style={[styles.button, (otpVerified && isUpdateButtonDisabled) ? styles.disabledButton : null]} 
                     onPress={otpSent ? (otpVerified ? handleUpdatePassword : handleVerifyOTP) : handleSendOTP}
+                    disabled={otpVerified && isUpdateButtonDisabled}
                 >
                     <Text style={styles.buttonText}>
                         {otpSent ? (otpVerified ? 'Cập nhật mật khẩu' : 'Xác nhận OTP') : 'Gửi mã OTP'}
@@ -181,6 +200,9 @@ const styles = StyleSheet.create({
         borderRadius: 5,
         marginTop: 10,
     },
+    disabledButton: {
+        backgroundColor: '#ccc',
+    },
     buttonText: {
         color: 'white',
         fontSize: 16,
@@ -190,6 +212,13 @@ const styles = StyleSheet.create({
         marginTop: 20,
         color: '#4CAF50',
         fontSize: 16,
+    },
+    errorText: {
+        color: 'red',
+        fontSize: 14,
+        marginTop: -5,
+        marginBottom: 10,
+        alignSelf: 'flex-start',
     },
 });
 

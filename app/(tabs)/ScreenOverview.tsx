@@ -2,11 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { Image } from 'react-native';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Platform, Dimensions } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { useNavigation, NavigationProp } from '@react-navigation/native'; // Updated import
+import { useNavigation, NavigationProp } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
 const { width, height } = Dimensions.get('window');
+
+type DateSortCriteria = 'none' | 'asc' | 'desc';
+type AmountSortCriteria = 'none' | 'asc' | 'desc';
 
 type RootStackParamList = {
     DetailTransaction: { transactionData: any };
@@ -16,15 +19,15 @@ type RootStackParamList = {
 };
 
 type ScreenOverViewProps = {
-    navigation: NavigationProp<RootStackParamList>; // Updated type usage
+    navigation: NavigationProp<RootStackParamList>;
 };
 
 type UserData = {
     notification?: string;
     transactions: string;
     categories: string;
-    amount?: number; // Assuming `amount` can be optional
-
+    amount?: number;
+    wallet?: number;
 };
 
 type Transaction = {
@@ -47,6 +50,8 @@ const ScreenOverView: React.FC<ScreenOverViewProps> = ({ navigation }) => {
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [filterType, setFilterType] = useState('all');
     const [hasNotification, setHasNotification] = useState(false);
+    const [dateSortCriteria, setDateSortCriteria] = useState<DateSortCriteria>('none');
+    const [amountSortCriteria, setAmountSortCriteria] = useState<AmountSortCriteria>('none');
 
     useEffect(() => {
         const fetchUserData = async () => {
@@ -90,23 +95,84 @@ const ScreenOverView: React.FC<ScreenOverViewProps> = ({ navigation }) => {
         });
     };
 
+    const sortTransactions = (transactions: Transaction[]) => {
+        return [...transactions].sort((a, b) => {
+            const dateA = new Date(a.date).getTime();
+            const dateB = new Date(b.date).getTime();
+            const amountA = a.type === 'income' ? a.amount : -a.amount;
+            const amountB = b.type === 'income' ? b.amount : -b.amount;
+    
+            if (dateSortCriteria !== 'none' && amountSortCriteria !== 'none') {
+                // Kết hợp sắp xếp theo cả ngày và giá
+                if (dateA !== dateB) {
+                    return dateSortCriteria === 'asc' ? dateA - dateB : dateB - dateA;
+                } else {
+                    return amountSortCriteria === 'asc' ? amountA - amountB : amountB - amountA;
+                }
+            } else if (dateSortCriteria !== 'none') {
+                // Chỉ sắp xếp theo ngày
+                return dateSortCriteria === 'asc' ? dateA - dateB : dateB - dateA;
+            } else if (amountSortCriteria !== 'none') {
+                // Chỉ sắp xếp theo giá
+                return amountSortCriteria === 'asc' ? amountA - amountB : amountB - amountA;
+            }
+    
+            // Nếu không có tiêu chí sắp xếp nào được chọn, giữ nguyên thứ tự
+            return 0;
+        });
+    };
     const filterTransactions = (transactions: Transaction[]) => {
-        if (filterType === 'all') {
-            return transactions;
-        } if (filterType === 'current') {
+        let filtered = transactions;
+        if (filterType === 'current') {
             const currentDate = new Date();
-            return transactions.filter(transaction => {
+            filtered = transactions.filter(transaction => {
                 const transactionDate = new Date(transaction.date);
                 return transactionDate.getMonth() === currentDate.getMonth() &&
                     transactionDate.getFullYear() === currentDate.getFullYear();
             });
-        }
-        else {
-            return transactions.filter(transaction => {
+        } else if (filterType === 'month') {
+            filtered = transactions.filter(transaction => {
                 const transactionDate = new Date(transaction.date);
                 return transactionDate.getMonth() === selectedDate.getMonth() &&
                     transactionDate.getFullYear() === selectedDate.getFullYear();
             });
+        }
+        return sortTransactions(filtered);
+    };
+
+    const handleDateSortToggle = () => {
+        setDateSortCriteria(prev => {
+            switch (prev) {
+                case 'none': return 'desc';
+                case 'desc': return 'asc';
+                case 'asc': return 'none';
+            }
+        });
+    };
+
+    const handleAmountSortToggle = () => {
+        setAmountSortCriteria(prev => {
+            switch (prev) {
+                case 'none': return 'desc';
+                case 'desc': return 'asc';
+                case 'asc': return 'none';
+            }
+        });
+    };
+
+    const getDateSortButtonText = () => {
+        switch (dateSortCriteria) {
+            case 'desc': return 'Ngày ↓';
+            case 'asc': return 'Ngày ↑';
+            default: return 'Ngày';
+        }
+    };
+
+    const getAmountSortButtonText = () => {
+        switch (amountSortCriteria) {
+            case 'desc': return 'Giá ↓';
+            case 'asc': return 'Giá ↑';
+            default: return 'Giá';
         }
     };
 
@@ -126,7 +192,6 @@ const ScreenOverView: React.FC<ScreenOverViewProps> = ({ navigation }) => {
                 notifications: [{ message: userData.notification, time: '5 ngày trước' }]
             });
             setHasNotification(false);
-            // You might want to update AsyncStorage to mark the notification as read
         }
     };
 
@@ -139,12 +204,20 @@ const ScreenOverView: React.FC<ScreenOverViewProps> = ({ navigation }) => {
 
     const filteredTransactions = filterTransactions(transactions);
 
+    // Tính toán tổng thu nhập và chi phí cố định (không filter)
+    const totalIncomeFixed = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+    const totalExpenseFixed = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+    const balanceFixed = totalIncomeFixed - totalExpenseFixed;
+
+    // Tính toán tổng số dư bao gồm cả số dư trong ví
+    const totalBalance = (userData.wallet || 0) + balanceFixed;
+
+    // Giữ lại phần tính toán đã filter theo tháng
     const totalIncome = filteredTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
     const totalExpense = filteredTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
     const balance = totalIncome - totalExpense;
-
     const groupedTransactions = filteredTransactions.reduce((groups: { [key: string]: Transaction[] }, transaction: Transaction) => {
-        const date = transaction.date;
+        const date = new Date(transaction.date).toISOString().split('T')[0]; // Use ISO date string for consistent grouping
         if (!groups[date]) {
             groups[date] = [];
         }
@@ -155,8 +228,11 @@ const ScreenOverView: React.FC<ScreenOverViewProps> = ({ navigation }) => {
     const currentDate = new Date();
     const currentMonth = currentDate.getMonth() + 1;
     const currentYear = currentDate.getFullYear();
-    const sortedDates = Object.keys(groupedTransactions).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
-
+    const sortedDates = Object.keys(groupedTransactions).sort((a, b) => {
+        const dateA = new Date(a).getTime();
+        const dateB = new Date(b).getTime();
+        return dateSortCriteria === 'asc' ? dateA - dateB : dateB - dateA;
+    });
     return (
         <View style={styles.container}>
             <View style={styles.header}>
@@ -164,7 +240,8 @@ const ScreenOverView: React.FC<ScreenOverViewProps> = ({ navigation }) => {
                     <Image source={require('../../assets/images/logodomdomnenxanh.png')} style={styles.logo} />
                     <View style={styles.balanceContainer}>
                         <Text style={styles.balance}>
-                            {userData.amount ? ((userData as any).amount < 0 ? '-' : '') + Math.abs((userData as any).amount).toLocaleString() : '0'} đ
+                            {totalBalance < 0 ? '-' : ''}
+                            {Math.abs(totalBalance).toLocaleString()} đ
                         </Text>
                     </View>
                     <TouchableOpacity onPress={handleNotificationPress} style={styles.notificationContainer}>
@@ -204,6 +281,7 @@ const ScreenOverView: React.FC<ScreenOverViewProps> = ({ navigation }) => {
                         />
                     )}
                 </View>
+
             </View>
             <ScrollView>
                 <View style={styles.overview}>
@@ -216,6 +294,25 @@ const ScreenOverView: React.FC<ScreenOverViewProps> = ({ navigation }) => {
                         <Text style={styles.overviewLabelExpense}>{totalExpense !== 0 ? '-' + totalExpense.toLocaleString() : '0'} đ</Text>
                     </View>
                     <Text style={styles.overviewTotal}>{balance.toLocaleString()} đ</Text>
+                </View>
+                <View style={styles.sortContainer}>
+                    <Text style={styles.sortLabel}>Sắp xếp theo:</Text>
+                    <TouchableOpacity
+                        style={[styles.sortButton, dateSortCriteria !== 'none' && styles.activeSortButton]}
+                        onPress={handleDateSortToggle}
+                    >
+                        <Text style={[styles.sortButtonText, dateSortCriteria !== 'none' && styles.activeSortButtonText]}>
+                            {getDateSortButtonText()}
+                        </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.sortButton, amountSortCriteria !== 'none' && styles.activeSortButton]}
+                        onPress={handleAmountSortToggle}
+                    >
+                        <Text style={[styles.sortButtonText, amountSortCriteria !== 'none' && styles.activeSortButtonText]}>
+                            {getAmountSortButtonText()}
+                        </Text>
+                    </TouchableOpacity>
                 </View>
                 {sortedDates.map(date => {
                     const dayTransactions = groupedTransactions[date];
@@ -249,7 +346,7 @@ const ScreenOverView: React.FC<ScreenOverViewProps> = ({ navigation }) => {
                                             <Text style={styles.transactionDescription}>{transaction.note}</Text>
                                         </View>
                                         <Text style={[styles.transactionAmount, { color: transaction.type === 'income' ? '#4CAF50' : '#FF0000' }]}>
-                                            {transaction.type === 'income' ? '+' : '-'}{transaction.amount.toLocaleString()} đ
+                                            {transaction.type === 'income' ? '+' : '-'}{Math.abs(transaction.amount).toLocaleString()} đ
                                         </Text>
                                     </TouchableOpacity>
                                 );
@@ -444,6 +541,39 @@ const styles = StyleSheet.create({
         width: width * 0.08,  // Adjust size as needed
         height: width * 0.08,  // Adjust size as needed
         resizeMode: 'contain',
+    },
+    sortContainer: {
+        flexDirection: 'row',
+        justifyContent: 'flex-start',
+        alignItems: 'center',
+        backgroundColor: '#fff',
+        padding: 10,
+        marginBottom: 10,
+    },
+    sortLabel: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        marginRight: 10,
+        width: '30%', // Điều chỉnh chiều rộng của nhãn
+    },
+    sortButton: {
+        padding: 10,
+        borderRadius: 5,
+        backgroundColor: '#f0f0f0',
+        marginHorizontal: 5,
+        width: '30%', // Tăng chiều rộng của nút
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    activeSortButton: {
+        backgroundColor: '#4CAF50',
+    },
+    sortButtonText: {
+        fontSize: 14,
+        color: '#333',
+    },
+    activeSortButtonText: {
+        color: '#fff',
     },
 });
 

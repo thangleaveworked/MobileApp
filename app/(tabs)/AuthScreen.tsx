@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, ScrollView, Dimensions } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import * as LocalAuthentication from 'expo-local-authentication';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 const { width, height } = Dimensions.get('window');
 
 const AuthScreen = () => {
@@ -11,52 +13,64 @@ const AuthScreen = () => {
     const [name, setName] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const navigation = useNavigation();
+    const [passwordError, setPasswordError] = useState('');
+    const [isRegisterButtonDisabled, setIsRegisterButtonDisabled] = useState(true);
+    const [isBiometricSupported, setIsBiometricSupported] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+    useEffect(() => {
+        checkBiometricSupport();
+    }, []);
     useFocusEffect(
         React.useCallback(() => {
-          // This effect runs when the screen comes into focus
-          setEmail('');
-          setPassword('');
-        }, [])
-      );
-    const handleForgotPassword = () => {
-        navigation.navigate('ForgotPasswordScreen' as never);
+            setEmail('');
+            setPassword('');
+            setName('');
+            setPasswordError('');
+            if (!isLogin) {
+                setIsRegisterButtonDisabled(true);
+            }
+        }, [isLogin])
+    );
+    const checkBiometricSupport = async () => {
+        const compatible = await LocalAuthentication.hasHardwareAsync();
+        setIsBiometricSupported(compatible);
     };
 
-    const isValidEmail = (email: string) => {
-        // Biểu thức chính quy để kiểm tra định dạng email
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        return emailRegex.test(email);
+    const handleBiometricAuth = async () => {
+        try {
+            const savedSignInData = await AsyncStorage.getItem('sign_in');
+            if (!savedSignInData) {
+                Alert.alert("Lỗi", "Không tìm thấy thông tin đăng nhập đã lưu");
+                return;
+            }
+
+            const biometricAuth = await LocalAuthentication.authenticateAsync({
+                promptMessage: 'Xác thực vân tay để đăng nhập',
+            });
+
+            if (biometricAuth.success) {
+                const { email, password } = JSON.parse(savedSignInData);
+                console.log("Dữ liệu đăng nhập:", { email, password });
+                await handleSignIn(email, password);
+            } else {
+                Alert.alert("Xác thực thất bại", "Vui lòng thử lại.");
+            }
+        } catch (error) {
+            console.error('Lỗi xác thực vân tay:', error);
+            Alert.alert("Lỗi", "Không thể xác thực vân tay. Vui lòng thử lại sau.");
+        }
     };
 
-    const handleSubmit = async () => {
-        if (!email || !password || (!isLogin && !name)) {
-            Alert.alert("Lỗi", "Vui lòng điền đầy đủ thông tin");
-            return;
-        }
-        if (password.length < 8) {
-            Alert.alert("Lỗi", "Mật khẩu phải có ít nhất 8 ký tự");
-            return;
-        }
-        if (!isValidEmail(email)) {
-            Alert.alert("Lỗi", "Vui lòng nhập một địa chỉ email hợp lệ");
-            return;
-        }
-    
+    const handleSignIn = async (email: string, password: string) => {
         setIsLoading(true);
-    
-        const body = isLogin 
-            ? { "type": "signin", email, password } 
-            : { "type": "signup", email, name, password };
-        // console.log(body);
         try {
             const response = await fetch(`http://192.168.2.23:5000/api`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(body),
+                body: JSON.stringify({ type: "signin", email, password }),
             });
-            // console.log(response);
             const data = await response.json();
             if (response.ok) {
                 await handleSuccessResponse(data);
@@ -70,17 +84,86 @@ const AuthScreen = () => {
             setIsLoading(false);
         }
     };
-    
+    const handleForgotPassword = () => {
+        navigation.navigate('ForgotPasswordScreen' as never);
+    };
+
+    const validatePassword = (password: string) => {
+        if (!isLogin) {
+            const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*])(?=.{8,})/;
+            if (!regex.test(password)) {
+                setPasswordError('Mật khẩu phải có ít nhất 8 ký tự, bao gồm chữ hoa, chữ thường và ký tự đặc biệt');
+                return false;
+            }
+        }
+        setPasswordError('');
+        return true;
+    };
+
+    const handlePasswordChange = (text: string) => {
+        setPassword(text);
+        if (!isLogin) {
+            const isValid = validatePassword(text);
+            setIsRegisterButtonDisabled(!isValid);
+        }
+    };
+
+    const isValidEmail = (email: string) => {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailRegex.test(email);
+    };
+
+    const handleSubmit = async () => {
+        if (!email || !password || (!isLogin && !name)) {
+            Alert.alert("Lỗi", "Vui lòng điền đầy đủ thông tin");
+            return;
+        }
+        if (!isValidEmail(email)) {
+            Alert.alert("Lỗi", "Vui lòng nhập một địa chỉ email hợp lệ");
+            return;
+        }
+        if (!isLogin) {
+            if (!validatePassword(password)) {
+                return;
+            }
+        }
+
+        setIsLoading(true);
+
+        const body = isLogin
+            ? { "type": "signin", email, password }
+            : { "type": "signup", email, name, password };
+        try {
+            const response = await fetch(`http://192.168.2.23:5000/api`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(body),
+            });
+            const data = await response.json();
+            if (response.ok) {
+                await handleSuccessResponse(data);
+            } else {
+                handleErrorResponse(data);
+            }
+        } catch (error) {
+            console.error("Error connecting to server:", error);
+            Alert.alert("Lỗi", "Không thể kết nối đến server");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     const handleSuccessResponse = async (data: any) => {
-        // console.log(data);
         switch (data.message) {
             case "User signed in successfully!":
             case "User logged in successfully!":
                 const savedSuccessfully = await saveUserData(data);
                 if (savedSuccessfully) {
                     const savedData = await AsyncStorage.getItem('userData');
+                    console.log("Dữ liệu người dùng đã lưu:", savedData);
                     if (savedData) {
-                        // console.log("Dữ liệu đã được lưu:", JSON.parse(savedData));
                         navigation.navigate('ScreenOverView' as never);
                     } else {
                         console.log("Không tìm thấy dữ liệu đã lưu");
@@ -96,14 +179,11 @@ const AuthScreen = () => {
                 ]);
                 break;
             default:
-                // console.log(data);
                 Alert.alert("Thông báo", data.message || "Có lỗi xảy ra");
         }
     };
-    
- 
 
-    const saveUserData = async (data:any) => {
+    const saveUserData = async (data: any) => {
         try {
             await AsyncStorage.setItem('userData', JSON.stringify({
                 user_id: data.user_id,
@@ -113,12 +193,13 @@ const AuthScreen = () => {
                 categories: data.categories,
                 transactions: data.transactions,
                 note: data.note,
-                wallet: data.wallet // Add this line to include the wallet balance
+                wallet: data.wallet,
+                password: password
             }));
-            return true; // Trả về true nếu lưu thành công
+            return true;
         } catch (error) {
             console.error("Error saving user data:", error);
-            return false; // Trả về false nếu có lỗi
+            return false;
         }
     };
 
@@ -131,12 +212,25 @@ const AuthScreen = () => {
             Alert.alert("Lỗi", data.message || "Có lỗi xảy ra");
         }
     };
+
+    const toggleLoginMode = () => {
+        setIsLogin(!isLogin);
+        setPasswordError('');
+        setPassword('');
+        setIsRegisterButtonDisabled(!isLogin);
+    };
+
     return (
-        <KeyboardAvoidingView 
+        <KeyboardAvoidingView
             behavior={Platform.OS === "ios" ? "padding" : "height"}
             style={styles.container}
+            keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
         >
-            <ScrollView contentContainerStyle={styles.scrollViewContent}>
+            <ScrollView
+                contentContainerStyle={styles.scrollViewContent}
+                keyboardShouldPersistTaps="handled"
+            >
+
                 <View style={styles.logoContainer}>
                     <Image
                         source={require('../../assets/images/logodomdom.png')}
@@ -162,22 +256,52 @@ const AuthScreen = () => {
                             placeholderTextColor="#aaa"
                         />
                     )}
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Mật khẩu"
-                        value={password}
-                        onChangeText={setPassword}
-                        secureTextEntry
-                        placeholderTextColor="#aaa"
-                    />
-                    {isLoading ? (
-                        <ActivityIndicator size="large" color="#4CAF50" />
-                    ) : (
-                        <TouchableOpacity style={styles.button} onPress={handleSubmit}>
-                            <Text style={styles.buttonText}>{isLogin ? 'Đăng nhập' : 'Đăng ký'}</Text>
+                    <View style={styles.passwordContainer}>
+                        <TextInput
+                            style={styles.passwordInput}
+                            placeholder="Mật khẩu"
+                            value={password}
+                            onChangeText={handlePasswordChange}
+                            secureTextEntry={!showPassword}
+                            placeholderTextColor="#aaa"
+                        />
+                        <TouchableOpacity
+                            style={styles.eyeIcon}
+                            onPress={() => setShowPassword(!showPassword)}
+                        >
+                            <Icon
+                                name={showPassword ? "eye-off" : "eye"}
+                                size={24}
+                                color="#aaa"
+                            />
                         </TouchableOpacity>
-                    )}
-                    <TouchableOpacity onPress={() => setIsLogin(!isLogin)}>
+                    </View>
+                    {!isLogin && passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
+
+                    <View style={styles.buttonContainer}>
+                        {isLoading ? (
+                            <ActivityIndicator size="large" color="#4CAF50" />
+                        ) : (
+                            <>
+                                <TouchableOpacity
+                                    style={[styles.button, (!isLogin && isRegisterButtonDisabled) ? styles.disabledButton : null]}
+                                    onPress={handleSubmit}
+                                    disabled={!isLogin && isRegisterButtonDisabled}
+                                >
+                                    <Text style={styles.buttonText}>{isLogin ? 'Đăng nhập' : 'Đăng ký'}</Text>
+                                </TouchableOpacity>
+                                {isLogin && isBiometricSupported && (
+                                    <TouchableOpacity
+                                        style={styles.fingerprintButton}
+                                        onPress={handleBiometricAuth}
+                                    >
+                                        <Icon name="fingerprint" size={24} color="#4CAF50" />
+                                    </TouchableOpacity>
+                                )}
+                            </>
+                        )}
+                    </View>
+                    <TouchableOpacity onPress={toggleLoginMode}>
                         <Text style={styles.switchText}>
                             {isLogin ? 'Chưa có tài khoản? Đăng ký' : 'Đã có tài khoản? Đăng nhập'}
                         </Text>
@@ -200,7 +324,7 @@ const styles = StyleSheet.create({
     },
     scrollViewContent: {
         flexGrow: 1,
-        justifyContent: 'flex-start', // Thay đổi từ 'center' thành 'flex-start'
+        justifyContent: 'center',
         alignItems: 'center',
         paddingVertical: 50,
     },
@@ -208,8 +332,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     logo: {
-        width: width * 0.4, // Giảm kích thước logo
-        height: width * 0.4, // Giảm kích thước logo
+        width: width * 0.4,
+        height: width * 0.4,
         resizeMode: 'contain',
     },
     formContainer: {
@@ -245,14 +369,17 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#e0e0e0',
     },
-    button: {
-        backgroundColor: '#4CAF50',
-        paddingVertical: 12,
-        paddingHorizontal: 30,
-        borderRadius: 25,
-        alignItems: 'center',
-        marginTop: 10,
-        width: '100%',
+    // button: {
+    //     backgroundColor: '#4CAF50',
+    //     paddingVertical: 12,
+    //     paddingHorizontal: 30,
+    //     borderRadius: 25,
+    //     alignItems: 'center',
+    //     marginTop: 10,
+    //     width: '100%',
+    // },
+    disabledButton: {
+        backgroundColor: '#ccc',
     },
     buttonText: {
         color: 'white',
@@ -269,6 +396,52 @@ const styles = StyleSheet.create({
         color: '#4CAF50',
         fontSize: 16,
         textDecorationLine: 'underline',
+    },
+    errorText: {
+        color: 'red',
+        fontSize: 14,
+        marginTop: -10,
+        marginBottom: 10,
+        alignSelf: 'flex-start',
+    }, buttonContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '100%',
+    },
+    button: {
+        backgroundColor: '#4CAF50',
+        paddingVertical: 12,
+        paddingHorizontal: 30,
+        borderRadius: 25,
+        alignItems: 'center',
+        marginTop: 10,
+        flex: 1,
+    },
+    fingerprintButton: {
+        padding: 10,
+        marginLeft: 10,
+        borderRadius: 25,
+        borderWidth: 1,
+        borderColor: '#4CAF50',
+    }, passwordContainer: {
+        width: '100%',
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#f9f9f9',
+        borderRadius: 10,
+        marginBottom: 15,
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
+    },
+    passwordInput: {
+        flex: 1,
+        paddingHorizontal: 15,
+        paddingVertical: 12,
+        fontSize: 16,
+    },
+    eyeIcon: {
+        padding: 10,
     },
 });
 
