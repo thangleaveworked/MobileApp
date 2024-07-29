@@ -4,7 +4,8 @@ import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Platform, Dimensi
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+// import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import MonthPicker from './MonthPicker'; // Import the new MonthPicker component
 
 const { width, height } = Dimensions.get('window');
 
@@ -52,6 +53,7 @@ const ScreenOverView: React.FC<ScreenOverViewProps> = ({ navigation }) => {
     const [hasNotification, setHasNotification] = useState(false);
     const [dateSortCriteria, setDateSortCriteria] = useState<DateSortCriteria>('none');
     const [amountSortCriteria, setAmountSortCriteria] = useState<AmountSortCriteria>('none');
+    const [showMonthPicker, setShowMonthPicker] = useState(false);
 
     useEffect(() => {
         const fetchUserData = async () => {
@@ -75,17 +77,15 @@ const ScreenOverView: React.FC<ScreenOverViewProps> = ({ navigation }) => {
 
         return unsubscribe;
     }, [navigation]);
-
-    const onDateChange = (_event: DateTimePickerEvent, selectedDate?: Date) => {
-        if (selectedDate) {
-            const currentDate = new Date(selectedDate);
-            currentDate.setDate(1); // Set to first day of the month
-            setShowDatePicker(Platform.OS === 'ios');
-            setSelectedDate(currentDate);
-            setFilterType('month');
-        }
+    const handleMonthSelect = (month: number, year: number) => {
+        setSelectedDate(new Date(year, month, 1));
+        setFilterType('month');
+        setShowMonthPicker(false);
     };
 
+    const handleReportPress = () => {
+        navigation.navigate('ScreenReport');
+    };
     const handleTransactionPress = (transaction: Transaction, category: Category | undefined) => {
         navigation.navigate('DetailTransaction', {
             transactionData: {
@@ -101,7 +101,7 @@ const ScreenOverView: React.FC<ScreenOverViewProps> = ({ navigation }) => {
             const dateB = new Date(b.date).getTime();
             const amountA = a.type === 'income' ? a.amount : -a.amount;
             const amountB = b.type === 'income' ? b.amount : -b.amount;
-    
+
             if (dateSortCriteria !== 'none' && amountSortCriteria !== 'none') {
                 // Kết hợp sắp xếp theo cả ngày và giá
                 if (dateA !== dateB) {
@@ -116,7 +116,7 @@ const ScreenOverView: React.FC<ScreenOverViewProps> = ({ navigation }) => {
                 // Chỉ sắp xếp theo giá
                 return amountSortCriteria === 'asc' ? amountA - amountB : amountB - amountA;
             }
-    
+
             // Nếu không có tiêu chí sắp xếp nào được chọn, giữ nguyên thứ tự
             return 0;
         });
@@ -267,19 +267,16 @@ const ScreenOverView: React.FC<ScreenOverViewProps> = ({ navigation }) => {
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={[styles.chip, filterType === 'month' ? styles.selectedChip : null]}
-                        onPress={() => setShowDatePicker(true)}
+                        onPress={() => setShowMonthPicker(true)}
                     >
                         <Text style={styles.chipText}>CHỌN THÁNG</Text>
                     </TouchableOpacity>
-                    {showDatePicker && (
-                        <DateTimePicker
-                            value={selectedDate}
-                            mode="date"
-                            display="spinner"
-                            onChange={onDateChange}
-                            maximumDate={new Date()}
-                        />
-                    )}
+                    <MonthPicker
+                        visible={showMonthPicker}
+                        onClose={() => setShowMonthPicker(false)}
+                        onSelect={handleMonthSelect}
+                        selectedDate={selectedDate}
+                    />
                 </View>
 
             </View>
@@ -295,6 +292,11 @@ const ScreenOverView: React.FC<ScreenOverViewProps> = ({ navigation }) => {
                     </View>
                     <Text style={styles.overviewTotal}>{balance.toLocaleString()} đ</Text>
                 </View>
+                {/* on press sang màn hình  */}
+                <TouchableOpacity onPress={handleReportPress}>
+                    <Text style={styles.detailButtonText}>Xem báo cáo {">>"}</Text>
+                </TouchableOpacity>
+
                 <View style={styles.sortContainer}>
                     <Text style={styles.sortLabel}>Sắp xếp theo:</Text>
                     <TouchableOpacity
@@ -575,6 +577,13 @@ const styles = StyleSheet.create({
     activeSortButtonText: {
         color: '#fff',
     },
+    detailButtonText: {
+        color: '#4CAF50',
+        textAlign: 'right',
+        marginRight: 20,
+        marginBottom: 10,
+    },
+
 });
 
 export default ScreenOverView;

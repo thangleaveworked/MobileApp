@@ -101,7 +101,8 @@ const UploadMediaFile = () => {
             date: data.date,
             description: data.description,
             ghichu: data.ghichu
-          } 
+          },
+          processedImageUri: url // Add this line to pass the image URI
         });  
         setTimeout(() => {
           Alert.alert('Thành công', 'Ảnh đã được xử lý thành công!');

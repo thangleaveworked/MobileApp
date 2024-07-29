@@ -24,8 +24,11 @@
         "backgroundColor": "#ffffff"
       },
       "permissions": [
-        "CAMERA"
-      ]
+        "CAMERA",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "package": "com.phucvinh.MobileApp"
     },
     "web": {
       "bundler": "metro",
@@ -38,6 +41,15 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "a4a74661-05b8-4818-a14a-41716309a0cf"
+      }
+    },
+    "owner": "phucvinh"
   }
 }

@@ -26,14 +26,14 @@ const NotificationScreen: React.FC<NotificationScreenProps> = ({ route }) => {
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Icon name="arrow-left" size={24} color="#fff" />
+          <Icon name="arrow-left" size={24} color="#000" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Thông báo</Text>
       </View>
       <ScrollView>
         {notifications.map((notification, index) => (
           <View key={index} style={styles.notificationItem}>
-            <Icon name="bell-outline" size={24} color="#fff" style={styles.notificationIcon} />
+            <Icon name="bell-outline" size={24} color="#000" style={styles.notificationIcon} />
             <View style={styles.notificationContent}>
               <Text style={styles.notificationText}>{notification.message}</Text>
             </View>
@@ -47,26 +47,26 @@ const NotificationScreen: React.FC<NotificationScreenProps> = ({ route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: '#fff',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#333',
+    borderBottomColor: '#e0e0e0',
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#000',
     marginLeft: 16,
   },
   notificationItem: {
     flexDirection: 'row',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#333',
+    borderBottomColor: '#e0e0e0',
   },
   notificationIcon: {
     marginRight: 16,
@@ -75,7 +75,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   notificationText: {
-    color: '#fff',
+    color: '#000',
     marginBottom: 4,
   },
   notificationTime: {

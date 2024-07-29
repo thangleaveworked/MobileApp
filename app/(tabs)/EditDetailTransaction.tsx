@@ -59,6 +59,7 @@ const EditDetailTransaction = () => {
           description: description,
           note: note
         };
+        console.log( updateData);
 
         // Gửi yêu cầu POST đến server
         const response = await fetch('http://192.168.2.23:5000/api', {
@@ -68,7 +69,6 @@ const EditDetailTransaction = () => {
           },
           body: JSON.stringify(updateData)
         });
-
         if (!response.ok) {
           throw new Error('Network response was not ok');
         }
@@ -95,7 +95,7 @@ const EditDetailTransaction = () => {
 
       }
     } catch (error) {
-      console.error("Error updating transaction:", error);
+      console.log("Error updating transaction:", error);
       Alert.alert("Lỗi", "Không thể cập nhật giao dịch. Vui lòng thử lại.");
     }
   };

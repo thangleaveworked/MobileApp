@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Dimensions, Alert, TextInput } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, Dimensions, Alert, TextInput, ScrollView, Modal, Image, ActivityIndicator } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RouteProp, useRoute } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import ImageViewer from 'react-native-image-zoom-viewer';
+import { firebase } from '../../firebaseConfig'; // Make sure this import is correct
 
 type RootStackParamList = {
   ScreenOverView: undefined;
@@ -56,6 +58,10 @@ const ScreenAddTransaction: React.FC<ScreenAddTransactionProps> = ({ navigation 
   const [category, setCategory] = useState<Category>({ name: 'Chọn nhóm', icon: 'help-circle-outline', isExpense: null });
   const [note, setNote] = useState('');
   const [description, setDescription] = useState('');
+  const [processedImageUri, setProcessedImageUri] = useState<string | null>(null);
+  const [isImageViewerVisible, setIsImageViewerVisible] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
 
   useEffect(() => {
     if (route.params?.invoiceData) {
@@ -71,7 +77,11 @@ const ScreenAddTransaction: React.FC<ScreenAddTransactionProps> = ({ navigation 
       if (description) setDescription(description);
       if (ghichu) setNote(ghichu);
     }
-  }, [route.params?.invoiceData]);
+    
+    if (route.params?.processedImageUri) {
+      setProcessedImageUri(route.params.processedImageUri);
+    }
+  }, [route.params]);
 
   useEffect(() => {
     if (route.params?.note) {
@@ -98,37 +108,39 @@ const ScreenAddTransaction: React.FC<ScreenAddTransactionProps> = ({ navigation 
     const regex = /^\d{2}\/\d{2}\/\d{4}$/;
     return regex.test(dateString);
   };
-
+  const handleImagePress = () => {
+    setIsImageViewerVisible(true);
+  };
   const parseDate = (dateString: string): Date => {
     const [day, month, year] = dateString.split('/');
     return new Date(`${year}-${month}-${day}`);
   };
 
-  const sendDataToServer = async (data: any): Promise<any> => {
-    try {
-      console.log('Sending data to server:', data);
-      const response = await fetch('http://192.168.2.23:5000/api', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
+  // const sendDataToServer = async (data: any): Promise<any> => {
+  //   try {
+  //     // console.log('Sending data to server:', data);
+  //     const response = await fetch('http://192.168.2.23:5000/api', {
+  //       method: 'POST',
+  //       headers: {
+  //         'Content-Type': 'application/json',
+  //       },
+  //       body: JSON.stringify(data),
+  //     });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.log('Error response:', errorText);
-        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
-      }
+  //     if (!response.ok) {
+  //       const errorText = await response.text();
+  //       console.log('Error response:', errorText);
+  //       throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+  //     }
 
-      const result = await response.json();
-      console.log('Server response:', result);
-      return result;
-    } catch (error) {
-      console.error('Error sending data to server:', error);
-      throw error;
-    }
-  };
+  //     const result = await response.json();
+  //     // console.log('Server response:', result);
+  //     return result;
+  //   } catch (error) {
+  //     console.error('Error sending data to server:', error);
+  //     throw error;
+  //   }
+  // };
 
   const formatNumber = (num: string): string => {
     num = num.replace(/[^\d.]/g, '');
@@ -179,12 +191,45 @@ const ScreenAddTransaction: React.FC<ScreenAddTransactionProps> = ({ navigation 
     return amountValue > 0 && category.id !== undefined;
   };
 
+  const sendDataToServer = async (data: any): Promise<any> => {
+    try {
+      const response = await fetch('http://192.168.2.23:5000/api', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+  
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.log('Error response:', errorText);
+        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+      }
+  
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error('Error sending data to server:', error);
+      throw error;
+    }
+  };
+  
+  const uploadImageToFirebase = async (uri: string, transactionId: string): Promise<void> => {
+    const response = await fetch(uri);
+    const blob = await response.blob();
+    const filename = `transaction_${transactionId}.jpg`;
+    const ref = firebase.storage().ref().child(`transactionImages/${filename}`);
+    await ref.put(blob);
+  };
+  
   const handleSave = async (): Promise<void> => {
     if (isFormValid()) {
       if (hasInvalidCharacters(amount)) {
         Alert.alert('Lỗi', 'Số tiền chứa ký tự không hợp lệ. Vui lòng chỉ sử dụng số và dấu phẩy.');
         return;
       }
+      setIsLoading(true);
       try {
         const userDataString = await AsyncStorage.getItem('userData');
         if (!userDataString) {
@@ -206,6 +251,10 @@ const ScreenAddTransaction: React.FC<ScreenAddTransactionProps> = ({ navigation 
         const result = await sendDataToServer(data);
         console.log('Transaction saved:', result);
   
+        if (processedImageUri && result.transaction_id) {
+          await uploadImageToFirebase(processedImageUri, result.transaction_id.toString());
+        }
+  
         userData = {
           ...userData,
           amount: result.amount,
@@ -221,11 +270,14 @@ const ScreenAddTransaction: React.FC<ScreenAddTransactionProps> = ({ navigation 
       } catch (error: any) {
         console.error('Error saving transaction:', error);
         Alert.alert('Lỗi', error.message || 'Đã xảy ra lỗi khi lưu giao dịch.');
+      } finally {
+        setIsLoading(false);
       }
     } else {
       Alert.alert('Lỗi', 'Vui lòng nhập số tiền và chọn nhóm trước khi lưu.');
     }
   };
+
 
   const getCategoryIconColor = (): string => {
     if (category.isExpense === null) {
@@ -235,7 +287,7 @@ const ScreenAddTransaction: React.FC<ScreenAddTransactionProps> = ({ navigation 
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.navigate('ScreenOverView' as never)}>
           <Icon name="close" size={24} color="#000" />
@@ -307,14 +359,53 @@ const ScreenAddTransaction: React.FC<ScreenAddTransactionProps> = ({ navigation 
         />
       )}
 
-      <TouchableOpacity
-        style={[styles.saveButton, { backgroundColor: isFormValid() ? '#4CAF50' : '#e0e0e0' }]}
+{processedImageUri && (
+        <TouchableOpacity style={styles.imageContainer} onPress={handleImagePress}>
+          <Image source={{ uri: processedImageUri }} style={styles.processedImage} />
+          <Text style={styles.zoomText}>Nhấn để phóng to</Text>
+        </TouchableOpacity>
+      )}
+
+<TouchableOpacity
+        style={[
+          styles.saveButton, 
+          { backgroundColor: isFormValid() && !isLoading ? '#4CAF50' : '#e0e0e0' }
+        ]}
         onPress={handleSave}
-        disabled={!isFormValid()}
+        disabled={!isFormValid() || isLoading}
       >
-        <Text style={[styles.saveButtonText, { color: isFormValid() ? '#FFF' : '#888' }]}>Lưu</Text>
+        {isLoading ? (
+          <ActivityIndicator color="#FFF" />
+        ) : (
+          <Text style={[styles.saveButtonText, { color: isFormValid() ? '#FFF' : '#888' }]}>
+            Lưu
+          </Text>
+        )}
       </TouchableOpacity>
-    </View>
+
+      <Modal visible={isImageViewerVisible} transparent={true}>
+        <ImageViewer
+          imageUrls={[{ url: processedImageUri || '' }]}
+          onCancel={() => setIsImageViewerVisible(false)}
+          enableSwipeDown
+          renderHeader={() => (
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setIsImageViewerVisible(false)}
+            >
+              <Icon name="close" size={24} color="#FFF" />
+            </TouchableOpacity>
+          )}
+        />
+      </Modal>
+
+      {isLoading && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color="#4CAF50" />
+          <Text style={styles.loadingText}>Đang lưu giao dịch...</Text>
+        </View>
+      )}
+    </ScrollView>
   );
 };
 
@@ -322,7 +413,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
-    paddingBottom: Dimensions.get('window').height / 2,
   },
   header: {
     flexDirection: 'row',
@@ -409,6 +499,38 @@ const styles = StyleSheet.create({
   saveButtonText: {
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  imageContainer: {
+    alignItems: 'center',
+    marginVertical: 16,
+  },
+  processedImage: {
+    width: Dimensions.get('window').width - 32,
+    height: 200,
+    resizeMode: 'cover',
+    borderRadius: 8,
+  },
+  zoomText: {
+    marginTop: 8,
+    color: '#888',
+    fontSize: 12,
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 40,
+    right: 20,
+    zIndex: 1000,
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: '#FFF',
+    marginTop: 10,
+    fontSize: 16,
   },
 });
 

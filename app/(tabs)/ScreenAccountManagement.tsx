@@ -166,7 +166,7 @@ const ScreenAccountManagement: React.FC<ScreenAccountManagementProps> = ({ route
                 setPasswordError(error);
                 return;
             }
-
+    
             try {
                 const response = await fetch('http://192.168.2.23:5000/api', {
                     method: 'POST',
@@ -180,6 +180,9 @@ const ScreenAccountManagement: React.FC<ScreenAccountManagementProps> = ({ route
                     })
                 });
                 if (response.ok) {
+                    // Update the biometric authentication data
+                    await updateBiometricAuthData(userData.user_email, newPassword);
+    
                     Alert.alert(
                         "Thành công",
                         "Mật khẩu đã được cập nhật thành công.",
@@ -201,6 +204,19 @@ const ScreenAccountManagement: React.FC<ScreenAccountManagementProps> = ({ route
         } else {
             setShowPasswordInput(true);
             setPasswordError('');
+        }
+    };
+    
+    const updateBiometricAuthData = async (email: string, password: string): Promise<void> => {
+        try {
+            await AsyncStorage.setItem('sign_in', JSON.stringify({
+                email: email,
+                password: password
+            }));
+            console.log('Biometric authentication data updated successfully');
+        } catch (error) {
+            console.error('Error updating biometric authentication data:', error);
+            Alert.alert("Lỗi", "Không thể cập nhật dữ liệu xác thực vân tay. Vui lòng thử lại sau.");
         }
     };
 

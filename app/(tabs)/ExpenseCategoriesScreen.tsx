@@ -147,13 +147,24 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F5F5F5',
   },
+  // header: {
+  //   flexDirection: 'row',
+  //   alignItems: 'center',
+  //   justifyContent: 'space-between',
+  //   padding: 16,
+  //   backgroundColor: '#FFF',
+  //   height: 56,
+  // },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
+    paddingBottom: 16,
+    paddingLeft: 16,
+    paddingRight: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
     backgroundColor: '#FFF',
-    height: 56,
+
   },
   headerButton: {
     width: 40,

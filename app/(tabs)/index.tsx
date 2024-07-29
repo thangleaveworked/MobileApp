@@ -31,6 +31,7 @@ import ScreenAccountManagement from './ScreenAccountManagement';
 import ForgotPasswordScreen from './ForgotPasswordScreen';
 
 import xacthucvantay from './xacthucvantay';
+import ScreenReport from './ScreenReport';
 
 
 
@@ -58,6 +59,7 @@ const App = () => {
       <Stack.Screen name="NotificationScreen" component={NotificationScreen} options={{ headerShown: false }} />
       <Stack.Screen name="ScreenAccountManagement" component={ScreenAccountManagement} options={{ headerShown: false }} />
       <Stack.Screen name="ForgotPasswordScreen" component={ForgotPasswordScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="ScreenReport" component={ScreenReport} options={{ headerShown: false }} />
       
       {/* <Stack.Screen name="Settings" component={HomeScreen}/> */}
     </Stack.Navigator>

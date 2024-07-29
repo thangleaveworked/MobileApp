@@ -1,20 +1,42 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, ScrollView, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, ScrollView, Alert, Image, Dimensions } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { firebase } from '../../firebaseConfig';
+import ImageViewer from 'react-native-image-zoom-viewer';
 
 const DetailTransaction = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-
+  const [transactionImage, setTransactionImage] = useState<string | null>(null);
+  const [isImageViewerVisible, setIsImageViewerVisible] = useState(false);
   const { transactionData } = route.params;
+
+  useEffect(() => {
+    loadTransactionImage();
+  }, [transactionData.transaction_id]);
 
   const handleEditDetailTransaction = () => {
     navigation.navigate('EditDetailTransaction', { transactionData });
   };
 
+  const loadTransactionImage = async () => {
+    try {
+      const imageRef = firebase.storage().ref().child(`transactionImages/transaction_${transactionData.transaction_id}.jpg`);
+      const url = await imageRef.getDownloadURL();
+      console.log('Firebase Storage URL:', url);
+      setTransactionImage(url);
+    } catch (error) {
+      console.log('Error loading transaction image:', error);
+      setTransactionImage(null);
+    }
+  };
+
+  const handleImagePress = () => {
+    setIsImageViewerVisible(true);
+  };
   const confirmDelete = async () => {
     try {
       // Xóa giao dịch khỏi AsyncStorage
@@ -22,19 +44,19 @@ const DetailTransaction = () => {
       if (userDataString) {
         const userData = JSON.parse(userDataString);
         const transactions = JSON.parse(userData.transactions);
-        
+
         // Lọc ra giao dịch cần xóa
         const updatedTransactions = transactions.filter(
           t => t.transaction_id !== transactionData.transaction_id
         );
-        
+
         // Cập nhật userData với danh sách giao dịch mới
         userData.transactions = JSON.stringify(updatedTransactions);
-        
+
         // Lưu userData đã cập nhật vào AsyncStorage
         await AsyncStorage.setItem('userData', JSON.stringify(userData));
       }
-  
+
       // Gửi yêu cầu POST đến server
       const response = await fetch('http://192.168.2.23:5000/api', {
         method: 'POST',
@@ -47,13 +69,13 @@ const DetailTransaction = () => {
           status: "0"
         })
       });
-  
+
       if (!response.ok) {
         throw new Error('Network response was not ok');
       }
-  
+
       const result = await response.json();
-  
+
       // Đóng modal xác nhận xóa
       setShowDeleteConfirm(false);
       navigation.navigate('ScreenOverView' as never);
@@ -102,6 +124,15 @@ const DetailTransaction = () => {
             <Text style={styles.detailText}>{transactionData.description || 'Không có mô tả'}</Text>
           </View>
         </View>
+        {transactionImage ? (
+            <TouchableOpacity style={styles.imageContainer} onPress={handleImagePress}>
+              <Image source={{ uri: transactionImage }} style={styles.transactionImage} />
+              <Text style={styles.zoomText}>Nhấn để phóng to</Text>
+            </TouchableOpacity>
+          ) :  (
+          <View >
+          </View>
+        )}
       </ScrollView>
 
       <Modal
@@ -122,6 +153,21 @@ const DetailTransaction = () => {
             </View>
           </View>
         </View>
+      </Modal>
+      <Modal visible={isImageViewerVisible} transparent={true}>
+        <ImageViewer
+          imageUrls={[{ url: transactionImage || '' }]}
+          onCancel={() => setIsImageViewerVisible(false)}
+          enableSwipeDown
+          renderHeader={() => (
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setIsImageViewerVisible(false)}
+            >
+              <Icon name="close" size={24} color="#FFF" />
+            </TouchableOpacity>
+          )}
+        />
       </Modal>
     </View>
   );
@@ -209,6 +255,27 @@ const styles = StyleSheet.create({
     color: '#4CAF50',
     fontWeight: 'bold',
     fontSize: 16,
+  },
+  imageContainer: {
+    alignItems: 'center',
+    marginVertical: 16,
+  },
+  transactionImage: {
+    width: Dimensions.get('window').width - 32,
+    height: 200,
+    resizeMode: 'cover',
+    borderRadius: 8,
+  },
+  zoomText: {
+    marginTop: 8,
+    color: '#888',
+    fontSize: 12,
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 40,
+    right: 20,
+    zIndex: 1000,
   },
 });
 

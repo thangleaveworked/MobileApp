@@ -194,7 +194,7 @@ const AuthScreen = () => {
                 transactions: data.transactions,
                 note: data.note,
                 wallet: data.wallet,
-                password: password
+                password: data.user_password
             }));
             return true;
         } catch (error) {

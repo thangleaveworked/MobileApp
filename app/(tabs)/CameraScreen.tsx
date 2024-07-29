@@ -7,8 +7,16 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { useNavigation } from '@react-navigation/native';
 type RootStackParamList = {
-  ScreenAddTransaction: { invoiceData: { total_amount: any; date: any; description: any; ghichu: any; }; };
-  // Add other screens as needed
+  ScreenAddTransaction: {
+    invoiceData: {
+      total_amount: number;
+      date: string;
+      description: string;
+      ghichu: string;
+    };
+    processedImageUri?: string; // Add this line
+  };
+  // ... other screens ...
 };
 type CameraScreenNavigationProp = StackNavigationProp<RootStackParamList, 'ScreenAddTransaction'>;
 
@@ -136,13 +144,14 @@ export default function CameraScreen() {
       // Kiểm tra xem data có chứa thông tin cần thiết không
       if (data && data.description) {
         console.log('Extracted data:', data);
-        navigation.navigate('ScreenAddTransaction', {
+        navigation.navigate('ScreenAddTransaction', { 
           invoiceData: {
             total_amount: data.total_amount,
             date: data.date,
             description: data.description,
             ghichu: data.ghichu
-          }
+          },
+          processedImageUri: url // Add this line to pass the image URI
         });
         setTimeout(() => {
           Alert.alert('Thành công', 'Ảnh đã được xử lý thành công!');
